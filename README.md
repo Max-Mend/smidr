@@ -20,6 +20,12 @@ Working with C projects usually means hand-writing a Makefile, CMakeLists.txt, o
 Requires Rust 1.85 or newer (this project uses the 2024 edition). Tested with Rust 1.96.0.
 
 ```sh
+cargo install smidr
+```
+
+Or build from source:
+
+```sh
 git clone https://github.com/Max-Mend/smidr
 cd smidr
 cargo install --path .
@@ -136,9 +142,12 @@ Please do not open a public issue for security vulnerabilities - see [SECURITY.m
 
 ## License
 
-Smidr is primarily distributed under the terms of both the MIT license and the Apache License (Version 2.0), with portions covered by various BSD-like licenses.
+Licensed under either of
 
-See [LICENSE-APACHE](LICENSE-APACHE), [LICENSE-MIT](LICENSE-MIT), and COPYRIGHT for details.
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+- MIT license ([LICENSE-MIT](LICENSE-MIT))
+
+at your option.
 
 ### Contribution
 
