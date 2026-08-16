@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-`smidr` is in early (MVP) development. Only the latest version on the `main` branch is currently supported with security fixes.
+`Smidr` is in early (MVP) development. Only the latest version on the `main` branch is currently supported with security fixes.
 
 | Version | Supported |
 | --- | --- |
@@ -25,7 +25,7 @@ When reporting, please include:
 
 ## What counts as a security issue here
 
-`smidr` executes external processes (the C compiler, `cmake`, `meson`, `make`, and - for `build_system = "custom"` - arbitrary shell commands defined in `smidr.toml`). Relevant reports include, for example:
+`Smidr` executes external processes (the C compiler, `cmake`, `meson`, `make`, and - for `build_system = "custom"` - arbitrary shell commands defined in `smidr.toml`). Relevant reports include, for example:
 
 - a way for a malformed `smidr.toml` or project layout to cause command or code execution the user did not intend
 - path traversal or unintended file writes outside the project directory
@@ -35,4 +35,4 @@ Note that `build_system = "custom"` is documented as executing arbitrary shell c
 
 ## Response
 
-`smidr` is a personal project maintained alongside my studies, so response times may be slower than you'd expect from a full-time maintained project. Reports won't be ignored, but please allow some time - feel free to follow up if you haven't heard back after a couple of weeks.
+`Smidr` is a personal project maintained alongside my studies, so response times may be slower than you'd expect from a full-time maintained project. Reports won't be ignored, but please allow some time - feel free to follow up if you haven't heard back after a couple of weeks.

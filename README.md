@@ -3,11 +3,11 @@
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 [![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org/)
 
-A `cargo`-inspired build tool for C projects, meant to bridge dependencies across different build systems into a single build.
+Smidr is a `cargo`- inspired build tool for C projects, meant to bridge dependencies across different build systems into a single build.
 
 ## Why
 
-Working with C projects usually means hand-writing a Makefile, CMakeLists.txt, or invoking the compiler directly. `smidr` handles that:
+Working with C projects usually means hand-writing a Makefile, CMakeLists.txt, or invoking the compiler directly. `Smidr` handles that:
 
 - scaffolds a new project
 - discovers and compiles `.c` sources
@@ -136,10 +136,9 @@ Please do not open a public issue for security vulnerabilities - see [SECURITY.m
 
 ## License
 
-Licensed under either of
+Smidr is primarily distributed under the terms of both the MIT license and the Apache License (Version 2.0), with portions covered by various BSD-like licenses.
 
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
-- MIT license ([LICENSE-MIT](LICENSE-MIT))
+See [LICENSE-APACHE](LICENSE-APACHE), [LICENSE-MIT](LICENSE-MIT), and COPYRIGHT for details.
 
 ### Contribution
 

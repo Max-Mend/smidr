@@ -1,6 +1,6 @@
-# Contributing to smidr
+# Contributing to Smidr
 
-Thanks for considering a contribution. `smidr` is a personal project maintained alongside my studies, so response times to issues and pull requests may be slow (see [If I've gone quiet](#if-ive-gone-quiet) below). It's also in early development, so the codebase and conventions may still shift - open an issue before starting on a larger change, to avoid duplicated or wasted work.
+Thanks for considering a contribution. `Smidr` is a personal project maintained alongside my studies, so response times to issues and pull requests may be slow (see [If I've gone quiet](#if-ive-gone-quiet) below). It's also in early development, so the codebase and conventions may still shift - open an issue before starting on a larger change, to avoid duplicated or wasted work.
 
 ## Getting started
 
