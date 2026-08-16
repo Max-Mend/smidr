@@ -3,7 +3,12 @@ name = "smidr"
 version = "0.1.0"
 edition = "2024"
 authors = ["Max-Mend"]
+description = "A cargo-inspired build tool for C projects, meant to bridge dependencies across different build systems into a single build"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/Max-Mend/smidr"
+readme = "README.md"
+keywords = ["c", "build-tool", "cli", "cmake", "compiler"]
+categories = ["development-tools", "command-line-utilities"]
 
 [dependencies]
 clap = { version = "4.6.6", features = ["derive"] }

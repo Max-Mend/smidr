@@ -119,7 +119,7 @@ impl Project {
 
         std::fs::write(root.join(".gitignore"), "target/\ncompile_commands.json\n")?;
 
-        println!("✅ Створено проєкт: {}", name);
+        println!("Smidr project created: {}", name);
         Ok(())
     }
 
