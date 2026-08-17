@@ -4,7 +4,7 @@
 
 //! Resolves where a dependency's source actually lives on disk.
 //!
-//! This module only answers "where is the source?" — it has no opinion
+//! This module only answers "where is the source?" - it has no opinion
 //! on how that source gets built (that's [`crate::toolchain`]). Currently
 //! only local `path =` dependencies are implemented; `git =` is parsed
 //! and validated but not yet fetched.
@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 pub enum SourceLocation {
     /// A local path, already resolved to an absolute, existing directory.
     Path(PathBuf),
-    /// A git repository to clone. Not yet consumed anywhere — see
+    /// A git repository to clone. Not yet consumed anywhere - see
     /// [`resolve`].
     Git { url: String, tag: String },
 }

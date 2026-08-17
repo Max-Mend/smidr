@@ -6,7 +6,7 @@
 //!
 //! Kept intentionally thin: parse CLI arguments, dispatch to the
 //! relevant module, and report any [`error::BuildError`] to the user.
-//! No business logic lives here — see [`project`] for project
+//! No business logic lives here - see [`project`] for project
 //! creation/loading and [`builder`] for compiling and running.
 
 mod builder;

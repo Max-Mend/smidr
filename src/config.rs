@@ -4,7 +4,7 @@
 
 //! Types and (de)serialization for `smidr.toml`.
 //!
-//! This module owns the *shape* of the manifest file only — no filesystem
+//! This module owns the *shape* of the manifest file only - no filesystem
 //! access beyond [`ManifestConfig::load`] and [`ManifestConfig::to_toml_string`],
 //! and no process execution. Reading, validating, and acting on this data
 //! is the job of [`crate::project`], [`crate::builder`], and
@@ -32,7 +32,21 @@ pub struct ProjectSection {
     pub authors_email: Vec<String>,
     pub description: Option<String>,
     pub license: Option<String>,
+    #[serde(rename = "type")]
+    pub project_type: ProjectType,
     pub c_standard: Option<String>,
+}
+
+/// The type of the project, either a binary, static library, or shared library.
+#[derive(Debug, Deserialize, Serialize, Default, PartialEq, Eq)]
+pub enum ProjectType {
+    #[default]
+    #[serde(rename = "bin")]
+    Binary,
+    #[serde(rename = "static")]
+    StaticLibrary,
+    #[serde(rename = "dynamic")]
+    SharedLibrary,
 }
 
 /// The `[build]` section: compiler and flag settings used by
@@ -44,7 +58,7 @@ pub struct BuildSection {
     pub cflags: Vec<String>,
 }
 
-/// One entry under `[dependencies]` — describes where a dependency's
+/// One entry under `[dependencies]` - describes where a dependency's
 /// source comes from and how to build it.
 ///
 /// Exactly one of `git` or `path` must be set; see
@@ -52,7 +66,7 @@ pub struct BuildSection {
 #[derive(Deserialize, Serialize)]
 pub struct DependencySpec {
     /// Git repository URL. Mutually exclusive with `path`. Not yet
-    /// implemented by [`crate::resolver`] — see the crate's roadmap.
+    /// implemented by [`crate::resolver`] - see the crate's roadmap.
     pub git: Option<String>,
     /// Path to a local copy of the dependency's source, relative to the
     /// project root. Mutually exclusive with `git`.
@@ -76,7 +90,7 @@ pub struct DependencySpec {
 }
 
 /// Which build system to use for a dependency. `Auto` probes the
-/// dependency's source directory and picks the best match — see
+/// dependency's source directory and picks the best match - see
 /// [`crate::toolchain::resolve_builder`] for the detection order and
 /// priority when more than one candidate is found.
 #[derive(Debug, Deserialize, Serialize, Default, PartialEq, Eq)]
@@ -90,7 +104,7 @@ pub enum BuildSystemKind {
 }
 
 /// Which C compiler to use. `Auto` probes for a working compiler on
-/// `PATH` — see `builder::compiler_binary` for the detection order.
+/// `PATH` - see `builder::compiler_binary` for the detection order.
 #[derive(Deserialize, Serialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum CompilerKind {

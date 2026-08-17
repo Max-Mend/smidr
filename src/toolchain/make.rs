@@ -5,7 +5,7 @@
 //! [`DepBuilder`] implementation for plain Makefile-based dependencies.
 //!
 //! Unlike CMake and Meson, a bare Makefile has no standard convention for
-//! an install prefix — this builder does its best (Autotools' `configure
+//! an install prefix - this builder does its best (Autotools' `configure
 //! --prefix`, then `make install PREFIX=`), but there's no guarantee a
 //! given Makefile honors either. When it doesn't, the failure message
 //! points at `build_system = "custom"` as the reliable fallback.
@@ -30,7 +30,7 @@ impl DepBuilder for MakeBuilder {
     }
 
     /// If a `configure` script is present, runs it with `--prefix` first
-    /// (the Autotools convention) — this is more reliable than guessing
+    /// (the Autotools convention) - this is more reliable than guessing
     /// at Makefile variables. Then runs `make`, then attempts
     /// `make install PREFIX=<prefix>` (the most common GNU convention for
     /// hand-written Makefiles).
@@ -41,7 +41,7 @@ impl DepBuilder for MakeBuilder {
     /// `PREFIX=` at all.
     fn build(&self, src_dir: &Path, prefix: &Path) -> Result<BuildOutput> {
         // Autotools convention: if `configure` exists, it determines the
-        // prefix for the generated Makefile — more reliable than guessing.
+        // prefix for the generated Makefile - more reliable than guessing.
         let configure = src_dir.join("configure");
         if configure.exists() {
             run(Command::new("./configure")

@@ -8,8 +8,8 @@
 //! [`crate::config`] settings off a [`Project`], resolves a concrete
 //! compiler binary, invokes it once per source file, and links the
 //! results. Dependency include paths (`project.resolved_deps`) are
-//! folded in, but the step that actually populates `resolved_deps` —
-//! calling [`crate::resolver`] and [`crate::toolchain`] — isn't wired up
+//! folded in, but the step that actually populates `resolved_deps` -
+//! calling [`crate::resolver`] and [`crate::toolchain`] - isn't wired up
 //! here yet (see the crate's roadmap).
 
 use crate::error::Result;
@@ -17,7 +17,7 @@ use crate::project::Project;
 use std::path::PathBuf;
 
 /// A single compiled `.c` file, paired with the exact command used to
-/// produce it. Currently unused — intended for feeding
+/// produce it. Currently unused - intended for feeding
 /// [`crate::compile_db`] once that's wired into `build_project`.
 pub struct CompiledObject {
     obj_path: PathBuf,

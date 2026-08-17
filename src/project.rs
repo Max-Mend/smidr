@@ -5,7 +5,7 @@
 //! The in-memory model of a `smidr` project.
 //!
 //! [`Project`] is a read-only view of what already exists (or should
-//! exist) on disk — [`Project::load`] reads `smidr.toml` and computes
+//! exist) on disk - [`Project::load`] reads `smidr.toml` and computes
 //! standard paths, [`Project::source_files`] reads `src/`. Neither
 //! creates or modifies any files. [`Project::init`] is the one exception:
 //! it's the write side, used by `smidr new` to scaffold a brand new
@@ -31,20 +31,20 @@ const MAIN_C_TEMPLATE: &str =
 pub struct Project {
     /// The project's root directory (where `smidr.toml` lives).
     pub root: PathBuf,
-    /// The fully parsed `smidr.toml` — `[project]`, `[build]`, and
+    /// The fully parsed `smidr.toml` - `[project]`, `[build]`, and
     /// `[dependencies]`.
     pub config: ManifestConfig,
 
-    /// `root/src` — where `.c` source files are discovered.
+    /// `root/src` - where `.c` source files are discovered.
     pub src_dir: PathBuf,
-    /// `root/target` — where object files and the final binary are written.
+    /// `root/target` - where object files and the final binary are written.
     pub build_dir: PathBuf,
-    /// `root/target/deps` — where dependency install prefixes live (see
+    /// `root/target/deps` - where dependency install prefixes live (see
     /// [`Project::dep_prefix`]).
     pub install_dir: PathBuf,
 
     /// Build results for each resolved dependency, keyed by dependency
-    /// name. Empty right after [`Project::load`] — populated
+    /// name. Empty right after [`Project::load`] - populated
     /// incrementally as dependencies are resolved and built.
     pub resolved_deps: Vec<(String, BuildOutput)>,
 }
@@ -127,7 +127,7 @@ impl Project {
     ///
     /// # Errors
     /// Returns [`BuildError::NoSourceFiles`] if `src/` exists but contains
-    /// no `.c` files — this is treated as a build error rather than
+    /// no `.c` files - this is treated as a build error rather than
     /// silently producing an empty binary.
     pub fn source_files(&self) -> Result<Vec<PathBuf>> {
         let mut sources = Vec::new();
@@ -148,7 +148,7 @@ impl Project {
         Ok(sources)
     }
 
-    /// The install prefix for a given dependency — where its build system
+    /// The install prefix for a given dependency - where its build system
     /// (CMake, Meson, Make, or a custom script) is told to install its
     /// `include/` and `lib/` output.
     pub fn dep_prefix(&self, dep_name: &str) -> PathBuf {

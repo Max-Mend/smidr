@@ -6,7 +6,7 @@
 //!
 //! Every fallible function in this crate returns [`Result<T>`], a thin
 //! alias over [`std::result::Result`] with [`BuildError`] as the error
-//! type. No module defines its own error enum — this keeps error handling
+//! type. No module defines its own error enum - this keeps error handling
 //! consistent across `config`, `project`, `builder`, `resolver`, and
 //! `toolchain`, and lets every caller propagate failures with a single `?`.
 
@@ -26,7 +26,7 @@ pub enum BuildError {
     Io(#[from] std::io::Error),
 
     /// A subprocess could not be started at all (distinct from a process
-    /// that started but exited with a non-zero status — see
+    /// that started but exited with a non-zero status - see
     /// [`BuildError::CommandFailed`]).
     #[error("Failed to run command: {0}")]
     Command(String),
@@ -84,11 +84,11 @@ pub enum BuildError {
     /// `build_system = "auto"` was set for a dependency, but none of the
     /// supported build systems (CMake, Meson, Make) could be detected in
     /// its source directory.
-    #[error("Could not detect build system for '{0}' — specify build_system in smidr.toml")]
+    #[error("Could not detect build system for '{0}' - specify build_system in smidr.toml")]
     BuildSystemDetectionFailed(String),
 
     /// A dependency-specific failure that doesn't fit the more specific
-    /// variants above — used throughout `resolver.rs` and `toolchain/*`
+    /// variants above - used throughout `resolver.rs` and `toolchain/*`
     /// for things like an unreachable source path or a misconfigured
     /// `custom` build.
     #[error("Dependency '{name}' failed: {reason}")]

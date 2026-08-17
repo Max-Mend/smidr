@@ -37,7 +37,7 @@ impl CustomBuilder {
 }
 
 impl DepBuilder for CustomBuilder {
-    /// Always `false` — `custom` is never auto-selected by
+    /// Always `false` - `custom` is never auto-selected by
     /// `BuildSystemKind::Auto`; it only runs when explicitly requested in
     /// `smidr.toml`.
     fn detect(_src_dir: &Path) -> bool {
@@ -55,7 +55,7 @@ impl DepBuilder for CustomBuilder {
     /// Since there's no build system here to introspect, the resulting
     /// [`BuildOutput`] is built from the standard prefix layout plus
     /// whatever the user explicitly listed in `libs` and
-    /// `extra_includes` — nothing is guessed.
+    /// `extra_includes` - nothing is guessed.
     ///
     /// # Errors
     /// Returns [`BuildError::Dependency`] if `build_commands` is empty.

@@ -6,7 +6,7 @@
 //! consumed by `clangd` and other C/C++ language servers for accurate
 //! code completion and diagnostics.
 //!
-//! This module only knows how to serialize a list of entries to disk —
+//! This module only knows how to serialize a list of entries to disk -
 //! building that list from the actual compile commands run during a
 //! build is [`crate::builder`]'s job (not yet wired up; see the crate's
 //! roadmap).
