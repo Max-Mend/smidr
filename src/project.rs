@@ -19,9 +19,11 @@ use crate::toolchain::BuildOutput;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-/// The `src/main.c` contents written by `smidr new`.
-const MAIN_C_TEMPLATE: &str =
-    "#include <stdio.h>\n\nint main() {\n    printf(\"Hello, World!\\n\");\n    return 0;\n}\n";
+/// Templates for the `smidr new` command.
+const MAIN_C_TEMPLATE: &str = include_str!("../templates/main.c");
+const GITIGNORE_TEMPLATE: &str = include_str!("../templates/.gitignore");
+const LIB_C_TEMPLATE: &str = include_str!("../templates/lib.c");
+const LIB_H_TEMPLATE: &str = include_str!("../templates/lib.h");
 
 /// A loaded (or freshly initialized) `smidr` project.
 ///
@@ -80,7 +82,7 @@ impl Project {
     /// writing outside the intended directory). Returns
     /// [`BuildError::ProjectAlreadyExists`] if `name` already exists on
     /// disk.
-    pub fn init(name: &str) -> Result<()> {
+    pub fn init(name: &str, project_type: ProjectType) -> Result<()> {
         if name.is_empty()
             || name.contains('/')
             || name.contains('\\')
@@ -98,7 +100,15 @@ impl Project {
         std::fs::create_dir_all(root.join("src"))?;
         std::fs::create_dir_all(root.join("include"))?;
 
-        std::fs::write(root.join("src/main.c"), MAIN_C_TEMPLATE)?;
+        match project_type {
+            ProjectType::Binary => {
+                std::fs::write(root.join("src/main.c"), MAIN_C_TEMPLATE)?;
+            }
+            ProjectType::StaticLibrary | ProjectType::SharedLibrary => {
+                std::fs::write(root.join("src/lib.c"), LIB_C_TEMPLATE)?;
+                std::fs::write(root.join("include/lib.h"), LIB_H_TEMPLATE)?;
+            }
+        }
 
         let config = ManifestConfig {
             project: ProjectSection {
@@ -106,6 +116,9 @@ impl Project {
                 version: "0.1.0".to_string(),
                 authors: Vec::new(),
                 authors_email: Vec::new(),
+                description: None,
+                license: None,
+                project_type,
                 c_standard: None,
             },
             build: BuildSection {
@@ -116,10 +129,9 @@ impl Project {
             dependencies: BTreeMap::new(),
         };
         std::fs::write(root.join("smidr.toml"), config.to_toml_string()?)?;
+        std::fs::write(root.join(".gitignore"), GITIGNORE_TEMPLATE)?;
 
-        std::fs::write(root.join(".gitignore"), "target/\ncompile_commands.json\n")?;
-
-        println!("Smidr project created: {}", name);
+        println!("Created project: {}", name);
         Ok(())
     }
 
@@ -131,7 +143,7 @@ impl Project {
     /// silently producing an empty binary.
     pub fn source_files(&self) -> Result<Vec<PathBuf>> {
         let mut sources = Vec::new();
-
+        
         let entries = std::fs::read_dir(&self.src_dir).map_err(BuildError::Io)?;
         for entry in entries {
             let entry = entry.map_err(BuildError::Io)?;
@@ -140,11 +152,9 @@ impl Project {
                 sources.push(path);
             }
         }
-
         if sources.is_empty() {
             return Err(BuildError::NoSourceFiles);
         }
-
         Ok(sources)
     }
 

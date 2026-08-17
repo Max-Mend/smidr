@@ -27,9 +27,6 @@ fn main() {
     }
 }
 
-/// Parse arguments and dispatch to the requested command. Separated from
-/// `main` so the whole command flow returns a `Result` and can use `?`
-/// throughout, rather than matching on errors at every call site.
 fn run() -> error::Result<()> {
     let cli = cli::parse_args();
 
