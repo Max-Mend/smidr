@@ -30,6 +30,8 @@ pub struct ProjectSection {
     pub version: String,
     pub authors: Vec<String>,
     pub authors_email: Vec<String>,
+    pub description: Option<String>,
+    pub license: Option<String>,
     pub c_standard: Option<String>,
 }
 

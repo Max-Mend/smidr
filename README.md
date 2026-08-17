@@ -1,7 +1,19 @@
-# Smidr
+<h1 align=center>Smidr</h1>
 
-[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
-[![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org/)
+<div align="center">
+  <h3 align=left>Support the Project</h3>
+  <h5 style="font-size: 15px; font-weight: 500;">If you find Smidr helpful and want to support my work and studies, you can buy me a coffee!</h5>
+  <a href="https://ko-fi.com/maxmend"><img src="https://img.shields.io/badge/Donate-Ko--Fi-F16061?style=for-the-badge&logo=ko-fi&logoColor=white&labelColor=101418" alt="Ko-Fi"></a>
+</div>
+
+---
+
+<div align=center>
+
+[![License](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-02569B?style=for-the-badge)](#license)
+[![Rust](https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+
+</div>
 
 Smidr is a `cargo`- inspired build tool for C projects, meant to bridge dependencies across different build systems into a single build.
 
