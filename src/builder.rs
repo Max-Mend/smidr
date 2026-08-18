@@ -128,13 +128,19 @@ pub fn run_project(project: &Project) -> Result<()> {
 ///
 /// # Errors
 /// Propagates any error from [`std::fs::remove_dir_all`].
-pub fn clean_project() -> Result<()> {
-    let target_dir = std::path::Path::new("target");
-    if target_dir.exists() {
-        std::fs::remove_dir_all(target_dir)?;
-        println!("Cleaned target directory.");
+pub fn clean_project(project: &Project) -> Result<()> {
+    if project.build_dir.exists() {
+        std::fs::remove_dir_all(&project.build_dir)?;
+        println!("Cleaned: {}", project.build_dir.display());
+    } else {
+        println!("Nothing to clean.");
     }
     Ok(())
+}
+
+pub fn rebuild_project(project: &Project) -> Result<()> {
+    clean_project(project)?;
+    build_project(project)
 }
 
 /// Resolve a [`crate::config::CompilerKind`] into an actual compiler

@@ -4,7 +4,7 @@
 
 //! Command-line argument definitions.
 //!
-//! This module only parses arguments - it has no knowledge of how
+//! This module only parses arguments — it has no knowledge of how
 //! commands are executed. Dispatching a parsed [`Commands`] to the
 //! right function is [`crate::main`]'s job, kept separate so the CLI
 //! layer can be tested (or replaced) independently of the underlying
@@ -32,7 +32,7 @@ pub enum Commands {
         /// nor `--lib` is given.
         #[arg(long, value_enum, conflicts_with = "lib")]
         r#type: Option<ProjectType>,
-        /// Shorthand for `--type static` - scaffold a library instead of
+        /// Shorthand for `--type static` — scaffold a library instead of
         /// a binary (the common case; use `--type dynamic` if you
         /// specifically need a shared object).
         #[arg(long)]
@@ -42,12 +42,13 @@ pub enum Commands {
     Build,
     /// Compile and run the current project.
     Run,
-    /// Clean build artifacts.
+    /// Remove the `target/` build directory.
     Clean,
+    /// Clean, then compile the current project from scratch.
+    Rebuild,
 
-    // TODO: Add: 
-    // 
-    // Rebuild, // clean and build
+    // TODO: Add:
+    //
     // Add, // add new dependency
     // Remove, // remove dependency
     // Test, // run tests
@@ -55,6 +56,7 @@ pub enum Commands {
     // Analyze, // analyze code
     // Format, // format code
     // Lint, // lint code
+    // Version, // print version
     // Update, // update smidr
 }
 
