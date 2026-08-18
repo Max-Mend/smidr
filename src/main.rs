@@ -47,5 +47,18 @@ fn run() -> error::Result<()> {
             let project = project::Project::load(&std::env::current_dir()?)?;
             builder::run_project(&project)
         }
+        Commands::Clean => {
+            let target_dir = std::path::Path::new("target");
+            if target_dir.exists() {
+                if let Err(e) = std::fs::remove_dir_all(target_dir) {
+                    eprintln!("Error: Failed to remove target directory: {}", e);
+                    std::process::exit(1);
+                }
+                println!("Cleaned target directory.");
+            } else {
+                println!("Nothing to clean.");
+            }
+            Ok(())
+        }
     }
 }

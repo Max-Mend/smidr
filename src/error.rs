@@ -55,6 +55,10 @@ pub enum BuildError {
     #[error("No .c files found in src/")]
     NoSourceFiles,
 
+    /// Cleaned target directory.
+    #[error("Cleaned target directory: {0}")]
+    Clean(String),
+
     // ---- Config (config.rs) ----
     /// Failed to serialize a [`crate::config::ManifestConfig`] back to TOML
     /// (used by `smidr new` when writing the generated `smidr.toml`).

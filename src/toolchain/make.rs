@@ -66,7 +66,7 @@ impl DepBuilder for MakeBuilder {
                 name: src_dir.display().to_string(),
                 reason: "`make install PREFIX=...` did not work - this Makefile \
                          may not support PREFIX=. Set build_system = \"custom\" \
-                         with explicit build_commands in smidr.toml"
+                         with explicit build_commands in Smidr.toml"
                     .to_string(),
             });
         }

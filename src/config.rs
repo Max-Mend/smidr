@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Max-Mend
 // This file is part of smidr: https://github.com/Max-Mend/smidr
 
-//! Types and (de)serialization for `smidr.toml`.
+//! Types and (de)serialization for `Smidr.toml`.
 //!
 //! This module owns the *shape* of the manifest file only - no filesystem
 //! access beyond [`ManifestConfig::load`] and [`ManifestConfig::to_toml_string`],
@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::Path;
 
-/// The full, typed contents of a `smidr.toml` file.
+/// The full, typed contents of a `Smidr.toml` file.
 #[derive(Deserialize, Serialize)]
 pub struct ManifestConfig {
     pub project: ProjectSection,
@@ -129,14 +129,14 @@ pub enum WarningLevel {
 }
 
 impl ManifestConfig {
-    /// Read and parse `smidr.toml` from `project_dir`.
+    /// Read and parse `Smidr.toml` from `project_dir`.
     ///
     /// # Errors
-    /// Returns [`BuildError::ManifestNotFound`] if no `smidr.toml` exists
+    /// Returns [`BuildError::ManifestNotFound`] if no `Smidr.toml` exists
     /// in `project_dir`, or [`BuildError::TomlDe`] if it exists but fails
     /// to parse.
     pub fn load(project_dir: &Path) -> Result<Self> {
-        let manifest_path = project_dir.join("smidr.toml");
+        let manifest_path = project_dir.join("Smidr.toml");
 
         if !manifest_path.exists() {
             return Err(BuildError::ManifestNotFound(manifest_path));
@@ -149,7 +149,7 @@ impl ManifestConfig {
     }
 
     /// Serialize this config back into a pretty-printed TOML string, for
-    /// writing out a freshly scaffolded `smidr.toml` (see
+    /// writing out a freshly scaffolded `Smidr.toml` (see
     /// [`crate::project::Project::init`]).
     pub fn to_toml_string(&self) -> Result<String> {
         Ok(toml::to_string_pretty(self)?)

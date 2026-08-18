@@ -107,7 +107,7 @@ pub fn resolve_builder(
                     // CMake was chosen.
                     eprintln!(
                         "Error: '{}': found multiple build systems ({}), choosing '{}'. \
-                         To change - specify build_system in smidr.toml.",
+                         To change - specify build_system in Smidr.toml.",
                         dep_name,
                         multiple
                             .iter()

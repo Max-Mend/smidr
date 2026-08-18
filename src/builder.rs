@@ -124,6 +124,19 @@ pub fn run_project(project: &Project) -> Result<()> {
     Ok(())
 }
 
+/// Remove build artifacts from a project.
+///
+/// # Errors
+/// Propagates any error from [`std::fs::remove_dir_all`].
+pub fn clean_project() -> Result<()> {
+    let target_dir = std::path::Path::new("target");
+    if target_dir.exists() {
+        std::fs::remove_dir_all(target_dir)?;
+        println!("Cleaned target directory.");
+    }
+    Ok(())
+}
+
 /// Resolve a [`crate::config::CompilerKind`] into an actual compiler
 /// binary name, verifying it's runnable rather than trusting the config
 /// blindly.

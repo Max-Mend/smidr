@@ -42,10 +42,11 @@ pub enum Commands {
     Build,
     /// Compile and run the current project.
     Run,
+    /// Clean build artifacts.
+    Clean,
 
     // TODO: Add: 
-    //
-    // Clean, // clean build files
+    // 
     // Rebuild, // clean and build
     // Add, // add new dependency
     // Remove, // remove dependency
@@ -54,7 +55,6 @@ pub enum Commands {
     // Analyze, // analyze code
     // Format, // format code
     // Lint, // lint code
-    // Version, // print version
     // Update, // update smidr
 }
 

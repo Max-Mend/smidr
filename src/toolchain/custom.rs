@@ -6,8 +6,8 @@
 //!
 //! Used when none of the built-in build systems fit, or when the user
 //! wants full control. **Security note:** `build()` executes the
-//! `build_commands` from `smidr.toml` verbatim via `sh -c` — running a
-//! `smidr.toml` from an untrusted source is equivalent to running its
+//! `build_commands` from `Smidr.toml` verbatim via `sh -c` — running a
+//! `Smidr.toml` from an untrusted source is equivalent to running its
 //! shell commands directly.
 
 use super::{collect_from_prefix, run, BuildOutput, DepBuilder};
@@ -16,7 +16,7 @@ use crate::error::{BuildError, Result};
 use std::path::Path;
 use std::process::Command;
 
-/// Runs arbitrary shell commands from `smidr.toml`
+/// Runs arbitrary shell commands from `Smidr.toml`
 /// (`build_commands`) when no built-in build system applies.
 pub struct CustomBuilder {
     commands: Vec<String>,
@@ -39,7 +39,7 @@ impl CustomBuilder {
 impl DepBuilder for CustomBuilder {
     /// Always `false` - `custom` is never auto-selected by
     /// `BuildSystemKind::Auto`; it only runs when explicitly requested in
-    /// `smidr.toml`.
+    /// `Smidr.toml`.
     fn detect(_src_dir: &Path) -> bool {
         false
     }
@@ -64,7 +64,7 @@ impl DepBuilder for CustomBuilder {
             return Err(BuildError::Dependency {
                 name: src_dir.display().to_string(),
                 reason: "build_system = \"custom\", but build_commands is empty \
-                         in smidr.toml"
+                         in Smidr.toml"
                     .to_string(),
             });
         }
