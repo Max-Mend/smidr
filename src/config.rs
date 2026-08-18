@@ -38,14 +38,17 @@ pub struct ProjectSection {
 }
 
 /// The type of the project, either a binary, static library, or shared library.
-#[derive(Debug, Deserialize, Serialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, PartialEq, Eq, clap::ValueEnum)]
 pub enum ProjectType {
     #[default]
     #[serde(rename = "bin")]
+    #[value(name = "bin")]
     Binary,
     #[serde(rename = "static")]
+    #[value(name = "static")]
     StaticLibrary,
     #[serde(rename = "dynamic")]
+    #[value(name = "dynamic")]
     SharedLibrary,
 }
 

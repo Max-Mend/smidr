@@ -13,7 +13,7 @@
 //! linked binary, dependency installs) live in [`crate::builder`] and
 //! [`crate::toolchain`], not here.
 
-use crate::config::{BuildSection, DependencySpec, ManifestConfig, ProjectSection};
+use crate::config::{BuildSection, ManifestConfig, ProjectSection, ProjectType};
 use crate::error::{BuildError, Result};
 use crate::toolchain::BuildOutput;
 use std::collections::BTreeMap;

@@ -10,6 +10,7 @@
 //! layer can be tested (or replaced) independently of the underlying
 //! logic.
 
+use crate::config::ProjectType;
 use clap::{Parser, Subcommand};
 
 /// Top-level CLI definition for the `smidr` binary.
@@ -26,6 +27,16 @@ pub enum Commands {
     /// Scaffold a new project.
     New {
         name: String,
+        /// Explicit project kind: `static` or `dynamic`. Cannot be
+        /// combined with `--lib`. Defaults to a binary if neither this
+        /// nor `--lib` is given.
+        #[arg(long, value_enum, conflicts_with = "lib")]
+        r#type: Option<ProjectType>,
+        /// Shorthand for `--type static` - scaffold a library instead of
+        /// a binary (the common case; use `--type dynamic` if you
+        /// specifically need a shared object).
+        #[arg(long)]
+        lib: bool,
     },
     /// Compile the current project.
     Build,
