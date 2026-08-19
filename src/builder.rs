@@ -73,6 +73,8 @@ pub fn build_project(project: &Project) -> Result<()> {
             .collect::<Vec<_>>());
         cmd.args(&opts.cflags);
 
+        cmd.arg(format!("-std={}", project.config.project.c_standard));
+        
         let output = cmd.output()?;
         if !output.status.success() {
             return Err(crate::error::BuildError::Compile(

@@ -28,13 +28,14 @@ pub struct ManifestConfig {
 pub struct ProjectSection {
     pub name: String,
     pub version: String,
+    #[serde(rename = "type")]
+    pub project_type: ProjectType,
+    #[serde(default)]
+    pub c_standard: CStandard,
     pub authors: Vec<String>,
     pub authors_email: Vec<String>,
     pub description: Option<String>,
     pub license: Option<String>,
-    #[serde(rename = "type")]
-    pub project_type: ProjectType,
-    pub c_standard: Option<String>,
 }
 
 /// The type of the project, either a binary, static library, or shared library.
@@ -52,7 +53,8 @@ pub enum ProjectType {
     SharedLibrary,
 }
 
-#[derive(Debug, Clone, clap::ValueEnum, Default)]
+#[derive(Debug, Clone, clap::ValueEnum, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum CStandard {
     C89,
     C90,

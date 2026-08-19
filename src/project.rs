@@ -82,7 +82,11 @@ impl Project {
     /// writing outside the intended directory). Returns
     /// [`BuildError::ProjectAlreadyExists`] if `name` already exists on
     /// disk.
-    pub fn init(name: &str, project_type: ProjectType, std: Option<CStandard>) -> Result<()> {
+    pub fn init(
+        name: &str,
+        project_type: ProjectType,
+        c_standard: Option<CStandard>,
+    ) -> Result<()> {
         if name.is_empty()
             || name.contains('/')
             || name.contains('\\')
@@ -119,7 +123,7 @@ impl Project {
                 description: None,
                 license: None,
                 project_type,
-                c_standard: std.map(|s| s.to_string()),
+                c_standard: c_standard.unwrap_or_default(),
             },
             build: BuildSection {
                 compiler: Default::default(),
