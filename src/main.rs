@@ -31,13 +31,13 @@ fn run() -> error::Result<()> {
     let cli = cli::parse_args();
 
     match &cli.command {
-        Commands::New { name, r#type, lib } => {
+        Commands::New { name, r#type, lib, std } => {
             let project_type = match (r#type, lib) {
                 (Some(t), _) => t.clone(),
                 (None, true) => config::ProjectType::StaticLibrary,
                 (None, false) => config::ProjectType::Binary,
             };
-            project::Project::init(name, project_type)
+            project::Project::init(name, project_type, std.clone())
         }
         Commands::Build => {
             let project = project::Project::load(&std::env::current_dir()?)?;

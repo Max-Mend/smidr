@@ -52,6 +52,20 @@ pub enum ProjectType {
     SharedLibrary,
 }
 
+#[derive(Debug, Clone, clap::ValueEnum, Default)]
+pub enum CStandard {
+    C89,
+    C90,
+    C99,
+    C11,
+    #[default]
+    C17,
+    C23,
+    Gnu99,
+    Gnu11,
+    Gnu17,
+}
+
 /// The `[build]` section: compiler and flag settings used by
 /// [`crate::builder::build_project`].
 #[derive(Deserialize, Serialize)]
@@ -153,5 +167,23 @@ impl ManifestConfig {
     /// [`crate::project::Project::init`]).
     pub fn to_toml_string(&self) -> Result<String> {
         Ok(toml::to_string_pretty(self)?)
+    }
+}
+
+// Implementation of the Display trait for CStandard, used for printing the CStandard enum to a string.
+impl std::fmt::Display for CStandard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            CStandard::C89 => "c89",
+            CStandard::C90 => "c90",
+            CStandard::C99 => "c99",
+            CStandard::C11 => "c11",
+            CStandard::C17 => "c17",
+            CStandard::C23 => "c23",
+            CStandard::Gnu99 => "gnu99",
+            CStandard::Gnu11 => "gnu11",
+            CStandard::Gnu17 => "gnu17",
+        };
+        write!(f, "{}", s)
     }
 }

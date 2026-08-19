@@ -13,7 +13,7 @@
 //! linked binary, dependency installs) live in [`crate::builder`] and
 //! [`crate::toolchain`], not here.
 
-use crate::config::{BuildSection, ManifestConfig, ProjectSection, ProjectType};
+use crate::config::{BuildSection, CStandard, ManifestConfig, ProjectSection, ProjectType};
 use crate::error::{BuildError, Result};
 use crate::toolchain::BuildOutput;
 use std::collections::BTreeMap;
@@ -82,7 +82,7 @@ impl Project {
     /// writing outside the intended directory). Returns
     /// [`BuildError::ProjectAlreadyExists`] if `name` already exists on
     /// disk.
-    pub fn init(name: &str, project_type: ProjectType) -> Result<()> {
+    pub fn init(name: &str, project_type: ProjectType, std: Option<CStandard>) -> Result<()> {
         if name.is_empty()
             || name.contains('/')
             || name.contains('\\')
@@ -119,7 +119,7 @@ impl Project {
                 description: None,
                 license: None,
                 project_type,
-                c_standard: None,
+                c_standard: std.map(|s| s.to_string()),
             },
             build: BuildSection {
                 compiler: Default::default(),

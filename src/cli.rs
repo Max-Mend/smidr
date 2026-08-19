@@ -10,7 +10,7 @@
 //! layer can be tested (or replaced) independently of the underlying
 //! logic.
 
-use crate::config::ProjectType;
+use crate::config::{CStandard, ProjectType};
 use clap::{Parser, Subcommand};
 
 /// Top-level CLI definition for the `smidr` binary.
@@ -37,6 +37,10 @@ pub enum Commands {
         /// specifically need a shared object).
         #[arg(long)]
         lib: bool,
+        /// Specify the C standard to use (e.g., c99, c11, c17, c23).
+        /// Defaults to c17.
+        #[arg(long, value_enum)]
+        std: Option<CStandard>,
     },
     /// Compile the current project.
     Build,
