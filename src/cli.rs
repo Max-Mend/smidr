@@ -4,7 +4,7 @@
 
 //! Command-line argument definitions.
 //!
-//! This module only parses arguments — it has no knowledge of how
+//! This module only parses arguments - it has no knowledge of how
 //! commands are executed. Dispatching a parsed [`Commands`] to the
 //! right function is [`crate::main`]'s job, kept separate so the CLI
 //! layer can be tested (or replaced) independently of the underlying
@@ -60,7 +60,6 @@ pub enum Commands {
     // Analyze, // analyze code
     // Format, // format code
     // Lint, // lint code
-    // Version, // print version
     // Update, // update smidr
 }
 

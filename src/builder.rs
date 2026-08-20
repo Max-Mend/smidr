@@ -14,6 +14,7 @@
 
 use crate::error::Result;
 use crate::project::Project;
+use crate::diagnostics::{Diagnostic, print_diagnostic};
 use std::path::PathBuf;
 
 /// A single compiled `.c` file, paired with the exact command used to
@@ -69,23 +70,51 @@ pub fn build_project(project: &Project) -> Result<()> {
 
         let mut cmd = std::process::Command::new(&opts.compiler);
         cmd.arg("-c").arg(&src).arg("-o").arg(&obj_path);
-        cmd.args(&opts.includes.iter().map(|p| format!("-I{}", p.display()))
-            .collect::<Vec<_>>());
+        cmd.args(
+            &opts
+                .includes
+                .iter()
+                .map(|p| format!("-I{}", p.display()))
+                .collect::<Vec<_>>(),
+        );
         cmd.args(&opts.cflags);
 
         cmd.arg(format!("-std={}", project.config.project.c_standard));
-        
+
         let output = cmd.output()?;
         if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let mut printed_pretty = false;
+
+            // Пробуємо знайти і розпарсити рядок з помилкою
+            for line in stderr.lines() {
+                if let Some(diag) = Diagnostic::parse_line(line) {
+                    print_diagnostic(&diag);
+                    printed_pretty = true;
+                    break; // Зупиняємось на першій головній помилці
+                }
+            }
+
+            // Якщо ми намалювали красиву помилку, повертаємо коротке повідомлення.
+            // Якщо ні (наприклад, формат Clang/GCC не розпізнався), віддаємо сирий вивід як запасний варіант.
+            let error_detail = if printed_pretty {
+                "See error details above..".to_string()
+            } else {
+                stderr.to_string()
+            };
+
             return Err(crate::error::BuildError::Compile(
                 src.display().to_string(),
-                String::from_utf8_lossy(&output.stderr).to_string(),
+                error_detail,
             ));
         }
         object_files.push(obj_path);
     }
 
-    let binary_path = project.build_dir.join("bin").join(&project.config.project.name);
+    let binary_path = project
+        .build_dir
+        .join("bin")
+        .join(&project.config.project.name);
     std::fs::create_dir_all(project.build_dir.join("bin"))?;
 
     let mut link_cmd = std::process::Command::new(&opts.compiler);
@@ -111,7 +140,10 @@ pub fn build_project(project: &Project) -> Result<()> {
 /// exits with a non-zero status.
 pub fn run_project(project: &Project) -> Result<()> {
     build_project(project)?;
-    let binary_path = project.build_dir.join("bin").join(&project.config.project.name);
+    let binary_path = project
+        .build_dir
+        .join("bin")
+        .join(&project.config.project.name);
 
     println!("Running: {}", binary_path.display());
     let status = std::process::Command::new(&binary_path).status()?;
@@ -167,21 +199,27 @@ fn compiler_binary(kind: &crate::config::CompilerKind) -> Result<&'static str> {
             if compiler_exists("gcc") {
                 Ok("gcc")
             } else {
-                Err(crate::error::BuildError::CompilerNotFound("gcc".to_string()))
+                Err(crate::error::BuildError::CompilerNotFound(
+                    "gcc".to_string(),
+                ))
             }
         }
         CompilerKind::Tcc => {
             if compiler_exists("tcc") {
                 Ok("tcc")
             } else {
-                Err(crate::error::BuildError::CompilerNotFound("tcc".to_string()))
+                Err(crate::error::BuildError::CompilerNotFound(
+                    "tcc".to_string(),
+                ))
             }
         }
         CompilerKind::Clang => {
             if compiler_exists("clang") {
                 Ok("clang")
             } else {
-                Err(crate::error::BuildError::CompilerNotFound("clang".to_string()))
+                Err(crate::error::BuildError::CompilerNotFound(
+                    "clang".to_string(),
+                ))
             }
         }
         CompilerKind::Auto => {

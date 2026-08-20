@@ -61,17 +61,17 @@ pub enum BuildError {
 
     // ---- Config (config.rs) ----
     /// Failed to serialize a [`crate::config::ManifestConfig`] back to TOML
-    /// (used by `smidr new` when writing the generated `smidr.toml`).
+    /// (used by `smidr new` when writing the generated `Smidr.toml`).
     #[error("Failed to serialize TOML: {0}")]
     TomlSer(#[from] toml::ser::Error),
 
-    /// Failed to parse an existing `smidr.toml` into a
+    /// Failed to parse an existing `Smidr.toml` into a
     /// [`crate::config::ManifestConfig`].
     #[error("Failed to parse TOML: {0}")]
     TomlDe(#[from] toml::de::Error),
 
-    /// `smidr.toml` does not exist in the expected project directory.
-    #[error("smidr.toml not found in {0}")]
+    /// `Іmidr.toml` does not exist in the expected project directory.
+    #[error("Smidr.toml not found in {0}")]
     ManifestNotFound(PathBuf),
 
     // ---- JSON (compile_db.rs) ----
@@ -80,7 +80,7 @@ pub enum BuildError {
     Json(#[from] serde_json::Error),
 
     // ---- Dependencies (resolver.rs / toolchain/*) ----
-    /// A dependency's `build_system` value in `smidr.toml` does not match
+    /// A dependency's `build_system` value in `Smidr.toml` does not match
     /// any known [`crate::config::BuildSystemKind`].
     #[error("Unknown build system '{0}' for dependency '{1}'")]
     UnknownBuildSystem(String, String),

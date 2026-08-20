@@ -13,6 +13,7 @@ mod builder;
 mod cli;
 mod compile_db;
 mod config;
+mod diagnostics;
 mod error;
 mod project;
 mod resolver;
