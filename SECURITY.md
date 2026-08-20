@@ -29,7 +29,7 @@ When reporting, please include:
 
 - a way for a malformed `Smidr.toml` or project layout to cause command or code execution the user did not intend
 - path traversal or unintended file writes outside the project directory
-- a way for `smidr new`, `Smidr build`, or `smidr run` to behave unsafely on untrusted input
+- a way for `smidr new`, `smidr build`, or `smidr run` to behave unsafely on untrusted input
 
 Note that `build_system = "custom"` is documented as executing arbitrary shell commands from `Smidr.toml` by design - running a `Smidr.toml` file from a source you don't trust is inherently equivalent to running its `build_commands` yourself. That is expected behavior, not a vulnerability, but reports on how to make this clearer or safer by default are welcome.
 
