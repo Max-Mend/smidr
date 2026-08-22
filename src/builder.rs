@@ -86,17 +86,14 @@ pub fn build_project(project: &Project) -> Result<()> {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let mut printed_pretty = false;
 
-            // Пробуємо знайти і розпарсити рядок з помилкою
             for line in stderr.lines() {
                 if let Some(diag) = Diagnostic::parse_line(line) {
                     print_diagnostic(&diag);
                     printed_pretty = true;
-                    break; // Зупиняємось на першій головній помилці
+                    break;
                 }
             }
-
-            // Якщо ми намалювали красиву помилку, повертаємо коротке повідомлення.
-            // Якщо ні (наприклад, формат Clang/GCC не розпізнався), віддаємо сирий вивід як запасний варіант.
+            
             let error_detail = if printed_pretty {
                 "See error details above..".to_string()
             } else {
