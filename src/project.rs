@@ -13,7 +13,7 @@
 //! linked binary, dependency installs) live in [`crate::builder`] and
 //! [`crate::toolchain`], not here.
 
-use crate::config::{BuildSection, CStandard, ManifestConfig, ProjectSection, ProjectType};
+use crate::config::{BuildSection, CStandard, Language, ManifestConfig, ProjectSection, ProjectType};
 use crate::error::{BuildError, Result};
 use crate::toolchain::BuildOutput;
 use std::collections::BTreeMap;
@@ -112,7 +112,7 @@ impl Project {
                 std::fs::write(root.join("src/lib.c"), LIB_C_TEMPLATE)?;
                 std::fs::write(root.join("include/lib.h"), LIB_H_TEMPLATE)?;
             }
-        }
+        }        
 
         let config = ManifestConfig {
             project: ProjectSection {
@@ -123,12 +123,16 @@ impl Project {
                 description: None,
                 license: None,
                 project_type,
+                language: Language::C,
                 c_standard: c_standard.unwrap_or_default(),
+                cpp_standard: Default::default(),
             },
+            
             build: BuildSection {
                 compiler: Default::default(),
                 warnings: Default::default(),
                 cflags: Vec::new(),
+                libs: Vec::new(),
             },
             dependencies: BTreeMap::new(),
         };

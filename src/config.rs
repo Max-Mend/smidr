@@ -31,7 +31,10 @@ pub struct ProjectSection {
     #[serde(rename = "type")]
     pub project_type: ProjectType,
     #[serde(default)]
+    pub language: Language,
+    #[serde(default)]
     pub c_standard: CStandard,
+    pub cpp_standard: CppStandard,
     pub authors: Vec<String>,
     pub authors_email: Vec<String>,
     pub description: Option<String>,
@@ -55,6 +58,14 @@ pub enum ProjectType {
 
 #[derive(Debug, Clone, clap::ValueEnum, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+pub enum Language {
+    #[default]
+    C,
+    Cpp,
+}
+
+#[derive(Debug, Clone, clap::ValueEnum, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum CStandard {
     C89,
     C90,
@@ -68,6 +79,20 @@ pub enum CStandard {
     Gnu17,
 }
 
+#[derive(Debug, Clone, clap::ValueEnum, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CppStandard {
+    Cpp98,
+    Cpp03,
+    Cpp11,
+    Cpp14,
+    Cpp17,
+    #[default]
+    Cpp20,
+    Cpp23,
+    Cpp26,
+}
+
 /// The `[build]` section: compiler and flag settings used by
 /// [`crate::builder::build_project`].
 #[derive(Deserialize, Serialize)]
@@ -75,6 +100,7 @@ pub struct BuildSection {
     pub compiler: CompilerKind,
     pub warnings: WarningLevel,
     pub cflags: Vec<String>,
+    pub libs: Vec<String>,
 }
 
 /// One entry under `[dependencies]` - describes where a dependency's
@@ -186,6 +212,23 @@ impl std::fmt::Display for CStandard {
             CStandard::Gnu11 => "gnu11",
             CStandard::Gnu17 => "gnu17",
         };
-        write!(f, "{}", s)
+        f.write_str(s)
+    }
+}
+
+// Implementation of the Display trait for CppStandard, used for printing the CppStandard enum to a string.
+impl std::fmt::Display for CppStandard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            CppStandard::Cpp98 => "c++98",
+            CppStandard::Cpp03 => "c++03",
+            CppStandard::Cpp11 => "c++11",
+            CppStandard::Cpp14 => "c++14",
+            CppStandard::Cpp17 => "c++17",
+            CppStandard::Cpp20 => "c++20",
+            CppStandard::Cpp23 => "c++23",
+            CppStandard::Cpp26 => "c++26",
+        };
+        f.write_str(s)
     }
 }

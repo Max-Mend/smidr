@@ -37,7 +37,7 @@ pub fn resolve(name: &str, spec: &DependencySpec, project_root: &Path) -> Result
     match (&spec.git, &spec.path) {
         (None, None) => Err(BuildError::Dependency {
             name: name.to_string(),
-            reason: "no source specified: specify git or path in smidr.toml".to_string(),
+            reason: "no source specified: specify git or path in Smidr.toml".to_string(),
         }),
 
         (Some(_), Some(_)) => Err(BuildError::Dependency {
