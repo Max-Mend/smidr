@@ -70,7 +70,7 @@ pub enum BuildError {
     #[error("Failed to parse TOML: {0}")]
     TomlDe(#[from] toml::de::Error),
 
-    /// `Іmidr.toml` does not exist in the expected project directory.
+    /// `Smidr.toml` does not exist in the expected project directory.
     #[error("Smidr.toml not found in {0}")]
     ManifestNotFound(PathBuf),
 

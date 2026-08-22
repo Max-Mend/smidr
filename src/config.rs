@@ -100,6 +100,7 @@ pub struct BuildSection {
     pub compiler: CompilerKind,
     pub warnings: WarningLevel,
     pub cflags: Vec<String>,
+    pub libs: Vec<String>,
 }
 
 /// One entry under `[dependencies]` - describes where a dependency's
