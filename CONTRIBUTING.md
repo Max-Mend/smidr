@@ -19,7 +19,7 @@ See the [Architecture](README.md#architecture) section of the README for how the
 
 - Run `cargo build` and `cargo clippy` before opening a pull request.
 - Keep pull requests focused - one logical change per PR is easier to review than several unrelated ones bundled together.
-- If you're fixing a bug, a minimal reproduction (a `smidr.toml` and/or `.c` file that triggers it) helps a lot.
+- If you're fixing a bug, a minimal reproduction (a `Smidr.toml` and/or `.c` file that triggers it) helps a lot.
 - If you're adding a feature, briefly describe the motivation in the PR description - not every idea needs to land, and understanding the "why" speeds up review.
 
 ## If I've gone quiet
@@ -39,7 +39,7 @@ When reporting a bug, please include:
 - your OS and Rust version (`rustc --version`)
 - the exact command you ran
 - the full error output
-- your `smidr.toml`, if relevant
+- your `Smidr.toml`, if relevant
 
 ## Security
 

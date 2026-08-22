@@ -24,7 +24,7 @@ Working with C projects usually means hand-writing a Makefile, CMakeLists.txt, o
 - scaffolds a new project
 - discovers and compiles `.c` sources
 - links the result into a binary
-- keeps project configuration in a plain `smidr.toml`, not a bespoke build script
+- keeps project configuration in a plain `Smidr.toml`, not a bespoke build script
 - is not tied to a specific compiler (clang, tcc, gcc, or the system `cc`)
 
 ## Installation
@@ -66,7 +66,7 @@ Hello, World!
 
 ```
 hello/
-├── smidr.toml
+├── Smidr.toml
 ├── .gitignore
 ├── include/
 └── src/
@@ -83,7 +83,7 @@ hello/
 
 ## Configuration
 
-Project metadata and build settings live in `smidr.toml`:
+Project metadata and build settings live in `Smidr.toml`:
 
 ```toml
 [project]
@@ -109,7 +109,7 @@ cflags = []
 
 ### A note on `[dependencies]`
 
-The `[dependencies]` section is parsed but not yet wired into the build - see [Roadmap](#roadmap). Once it is, be aware that `build_system = "custom"` runs arbitrary shell commands defined in `build_commands`. Only use a `smidr.toml` from a source you trust, the same way you would with any shell script.
+The `[dependencies]` section is parsed but not yet wired into the build - see [Roadmap](#roadmap). Once it is, be aware that `build_system = "custom"` runs arbitrary shell commands defined in `build_commands`. Only use a `Smidr.toml` from a source you trust, the same way you would with any shell script.
 
 ## Examples
 
@@ -134,7 +134,7 @@ src/
     └── custom.rs
 ```
 
-Each external process (the compiler, `cmake`, `meson`) is invoked behind a dedicated, isolated layer. `smidr` itself is not tied to any single build tool.
+Each external process (the compiler, `cmake`, `meson`) is invoked behind a dedicated, isolated layer. `Smidr` itself is not tied to any single build tool.
 
 ## Roadmap
 
