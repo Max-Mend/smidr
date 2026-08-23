@@ -135,6 +135,8 @@ impl Project {
                 libs: Vec::new(),
             },
             dependencies: BTreeMap::new(),
+            workspace: None,
+            extra_bins: Vec::new(),
         };
         std::fs::write(root.join("Smidr.toml"), config.to_toml_string()?)?;
         std::fs::write(root.join(".gitignore"), GITIGNORE_TEMPLATE)?;

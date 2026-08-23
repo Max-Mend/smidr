@@ -95,7 +95,7 @@ pub fn build_project(project: &Project) -> Result<()> {
             }
 
             let error_detail = if printed_pretty {
-                "See error details above..".to_string()
+                "See error details above...".to_string()
             } else {
                 stderr.to_string()
             };
@@ -117,6 +117,7 @@ pub fn build_project(project: &Project) -> Result<()> {
     let mut link_cmd = std::process::Command::new(&opts.compiler);
     link_cmd.args(&object_files);
     link_cmd.arg("-o").arg(&binary_path);
+    link_cmd.args(project.config.build.libs.iter().map(|l| format!("-l{}", l)));
 
     let output = link_cmd.output()?;
     if !output.status.success() {

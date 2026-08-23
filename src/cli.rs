@@ -53,7 +53,6 @@ pub enum Commands {
 
     // TODO: Add:
     //
-    // Add, // add new dependency
     // Remove, // remove dependency
     // Test, // run tests
     // Profile, // profile build
