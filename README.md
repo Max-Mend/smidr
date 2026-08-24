@@ -171,4 +171,4 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 
 ### Stars
 
-https://www.star-history.com/?repos=Max-Mend%2Fsmidr&type=date&logscale=&legend=top-left
+<a>href="https://www.star-history.com/?repos=Max-Mend%2Fsmidr&type=date&logscale=&legend=top-left"</a>
