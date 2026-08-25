@@ -31,7 +31,7 @@ pub enum SourceLocation {
 ///
 /// # Errors
 /// Returns [`BuildError::Dependency`] if neither or both of `git`/`path`
-/// are set, if a `path` dependency doesn't exist on disk, or if a `git`
+/// are set, if a `path` dependency does not exist on disk, or if a `git`
 /// dependency is specified (not yet supported).
 pub fn resolve(name: &str, spec: &DependencySpec, project_root: &Path) -> Result<SourceLocation> {
     match (&spec.git, &spec.path) {

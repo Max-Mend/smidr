@@ -19,7 +19,6 @@ use crate::toolchain::BuildOutput;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-/// Templates for the `smidr new` command.
 const GITIGNORE_TEMPLATE: &str = include_str!("../templates/.gitignore");
 const MAIN_C_TEMPLATE: &str = include_str!("../templates/main.c");
 const LIB_C_TEMPLATE: &str = include_str!("../templates/lib.c");
@@ -149,27 +148,56 @@ impl Project {
         Ok(())
     }
 
-    /// Find every `.c` file directly inside `src_dir` (non-recursive).
+    /// Finds all source and header files in `dirs` matching `extensions` (recursively).
     ///
     /// # Errors
-    /// Returns [`BuildError::NoSourceFiles`] if `src/` exists but contains
-    /// no `.c` files - this is treated as a build error rather than
-    /// silently producing an empty binary.
-    pub fn source_files(&self) -> Result<Vec<PathBuf>> {
-        let mut sources = Vec::new();
-        
-        let entries = std::fs::read_dir(&self.src_dir).map_err(BuildError::Io)?;
-        for entry in entries {
+    /// Returns [`BuildError::Io`] if reading directory contents fails.
+    fn collect_files(&self, dirs: &[&Path], extensions: &[&str]) -> Result<Vec<PathBuf>> {
+        let mut files = Vec::new();
+        for dir in dirs {
+            if !dir.exists() {
+                continue;
+            }
+            Self::collect_files_recursive(dir, extensions, &mut files)?;
+        }
+        Ok(files)
+    }
+
+    fn collect_files_recursive(dir: &Path, extensions: &[&str], out: &mut Vec<PathBuf>) -> Result<()> {
+        for entry in std::fs::read_dir(dir).map_err(BuildError::Io)? {
             let entry = entry.map_err(BuildError::Io)?;
             let path = entry.path();
-            if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("c") {
-                sources.push(path);
+
+            if path.is_dir() {
+                Self::collect_files_recursive(&path, extensions, out)?;
+            } else if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
+                if extensions.contains(&ext) {
+                    out.push(path);
+                }
             }
         }
+        Ok(())
+    }
+
+    /// Finds source files in `src_dir`.
+    ///
+    /// # Errors
+    /// Returns [`BuildError::NoSourceFiles`] if `src/` contains no matching source files.
+    pub fn source_files(&self) -> Result<Vec<PathBuf>> {
+        let sources = self.collect_files(&[&self.src_dir], &["c", "cpp", "cc", "cxx"])?;
         if sources.is_empty() {
             return Err(BuildError::NoSourceFiles);
         }
         Ok(sources)
+    }
+
+    /// Finds all source and header files in `src_dir` and `include` for formatting.
+    pub fn formattable_files(&self) -> Result<Vec<PathBuf>> {
+        let include_dir = self.root.join("include");
+        self.collect_files(
+            &[&self.src_dir, &include_dir],
+            &["c", "h", "cpp", "hpp", "cc", "hxx", "cxx", "hh"],
+        )
     }
 
     /// The install prefix for a given dependency - where its build system

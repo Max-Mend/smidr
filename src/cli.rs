@@ -47,9 +47,13 @@ pub enum Commands {
     /// Compile and run the current project.
     Run,
     /// Remove the `target/` build directory.
-    Clean,
+    #[command(alias = "clean")]
+    Cl,
     /// Clean, then compile the current project from scratch.
     Rebuild,
+    /// Format project source and header files with clang-format.
+    #[command(alias = "format")]
+    Fmt,
 
     // TODO: Add:
     // Add, // add dependency
@@ -57,7 +61,6 @@ pub enum Commands {
     // Test, // run tests
     // Profile, // profile build
     // Analyze, // analyze code
-    // Format, // format code
     // Lint, // lint code
     // Update, // update smidr
 }

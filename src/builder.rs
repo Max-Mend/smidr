@@ -202,6 +202,42 @@ pub fn rebuild_project(project: &Project) -> Result<()> {
     build_project(project)
 }
 
+/// Format project source and header files with clang-format.
+///
+/// # Errors
+/// Returns [crate::error::BuildError::CompilerNotFound] if
+/// clang-format isn't on PATH. Returns
+/// [crate::error::BuildError::CommandFailed] if clang-format exits
+/// with a non-zero status.
+pub fn fmt_project(project: &Project) -> Result<()> {
+    if !command_exists("clang-format") {
+        return Err(crate::error::BuildError::CompilerNotFound(
+            "clang-format".to_string(),
+        ));
+    }
+
+    let files = project.formattable_files()?;
+    if files.is_empty() {
+        println!("Nothing to format.");
+        return Ok(());
+    }
+
+    let mut cmd = std::process::Command::new("clang-format");
+    cmd.arg("-i");
+    cmd.args(&files);
+
+    let status = cmd.status()?;
+    if !status.success() {
+        return Err(crate::error::BuildError::CommandFailed {
+            cmd: "clang-format".to_string(),
+            code: status.code(),
+        });
+    }
+
+    println!("Formatted {} file(s).", files.len());
+    Ok(())
+}
+
 /// Resolve a [`crate::config::CompilerKind`] into an actual compiler
 /// binary name, verifying it's runnable rather than trusting the config
 /// blindly.
@@ -221,7 +257,7 @@ fn compiler_binary(kind: &crate::config::CompilerKind) -> Result<&'static str> {
 
     match kind {
         CompilerKind::Gcc => {
-            if compiler_exists("gcc") {
+            if command_exists("gcc") {
                 Ok("gcc")
             } else {
                 Err(crate::error::BuildError::CompilerNotFound(
@@ -230,7 +266,7 @@ fn compiler_binary(kind: &crate::config::CompilerKind) -> Result<&'static str> {
             }
         }
         CompilerKind::Tcc => {
-            if compiler_exists("tcc") {
+            if command_exists("tcc") {
                 Ok("tcc")
             } else {
                 Err(crate::error::BuildError::CompilerNotFound(
@@ -239,7 +275,7 @@ fn compiler_binary(kind: &crate::config::CompilerKind) -> Result<&'static str> {
             }
         }
         CompilerKind::Clang => {
-            if compiler_exists("clang") {
+            if command_exists("clang") {
                 Ok("clang")
             } else {
                 Err(crate::error::BuildError::CompilerNotFound(
@@ -249,7 +285,7 @@ fn compiler_binary(kind: &crate::config::CompilerKind) -> Result<&'static str> {
         }
         CompilerKind::Auto => {
             for candidate in ["clang", "tcc", "cc", "gcc"] {
-                if compiler_exists(candidate) {
+                if command_exists(candidate) {
                     return Ok(candidate);
                 }
             }
@@ -262,7 +298,7 @@ fn compiler_binary(kind: &crate::config::CompilerKind) -> Result<&'static str> {
 
 /// Check whether `name` is a runnable compiler on `PATH`, by attempting
 /// to run `<name> --version` and discarding its output.
-fn compiler_exists(name: &str) -> bool {
+fn command_exists(name: &str) -> bool {
     std::process::Command::new(name)
         .arg("--version")
         .stdout(std::process::Stdio::null())
