@@ -12,9 +12,10 @@
 //! calling [`crate::resolver`] and [`crate::toolchain`] - isn't wired up
 //! here yet (see the crate's roadmap).
 
+use crate::compile_db::CompileCommand;
+use crate::diagnostics::{print_diagnostic, Diagnostic};
 use crate::error::Result;
 use crate::project::Project;
-use crate::diagnostics::{Diagnostic, print_diagnostic};
 use std::path::PathBuf;
 
 /// A single compiled `.c` file, paired with the exact command used to
@@ -37,7 +38,10 @@ pub struct CompileOptions {
 /// `target/bin/<project-name>`.
 ///
 /// Steps: resolve a compiler ([`compiler_binary`]), compile each source
-/// file to `target/<name>.o`, then link all object files together.
+/// file to `target/<name>.o`, then link all object files together. A
+/// `compile_commands.json` (recording the exact command used for each
+/// file) is written to the project root once all files have compiled
+/// successfully.
 ///
 /// # Errors
 /// Returns [`crate::error::BuildError::CompilerNotFound`] if no usable
@@ -63,6 +67,7 @@ pub fn build_project(project: &Project) -> Result<()> {
     }
 
     let mut object_files: Vec<PathBuf> = Vec::new();
+    let mut compile_commands: Vec<CompileCommand> = Vec::new();
 
     for src in sources {
         let file_stem = src.file_stem().unwrap().to_str().unwrap();
@@ -78,8 +83,12 @@ pub fn build_project(project: &Project) -> Result<()> {
                 .collect::<Vec<_>>(),
         );
         cmd.args(&opts.cflags);
-
         cmd.arg(format!("-std={}", project.config.project.c_standard));
+
+        // Recording the actual command used for this specific file - 
+        // doing it before .output(), while cmd is still available for formatting, 
+        // and after all arguments have been added.
+        let command_str = format!("{:?}", cmd);
 
         let output = cmd.output()?;
         if !output.status.success() {
@@ -105,13 +114,27 @@ pub fn build_project(project: &Project) -> Result<()> {
                 error_detail,
             ));
         }
+
+        compile_commands.push(CompileCommand {
+            directory: project.root.display().to_string(),
+            file: src.display().to_string(),
+            command: command_str,
+            output: obj_path.display().to_string(),
+        });
+
         object_files.push(obj_path);
     }
 
-    let binary_path = project
-        .build_dir
-        .join("bin")
-        .join(&project.config.project.name);
+    crate::compile_db::write(&compile_commands, &project.root.join("compile_commands.json"))?;
+
+    let binary_path = project.build_dir.join("bin").join(
+        project
+            .config
+            .project
+            .output_name
+            .as_ref()
+            .unwrap_or(&project.config.project.name),
+    );
     std::fs::create_dir_all(project.build_dir.join("bin"))?;
 
     let mut link_cmd = std::process::Command::new(&opts.compiler);
@@ -138,10 +161,14 @@ pub fn build_project(project: &Project) -> Result<()> {
 /// exits with a non-zero status.
 pub fn run_project(project: &Project) -> Result<()> {
     build_project(project)?;
-    let binary_path = project
-        .build_dir
-        .join("bin")
-        .join(&project.config.project.name);
+    let binary_path = project.build_dir.join("bin").join(
+        project
+            .config
+            .project
+            .output_name
+            .as_ref()
+            .unwrap_or(&project.config.project.name),
+    );
 
     println!("Running: {}", binary_path.display());
     let status = std::process::Command::new(&binary_path).status()?;
@@ -180,7 +207,7 @@ pub fn rebuild_project(project: &Project) -> Result<()> {
 /// blindly.
 ///
 /// An explicit choice (`Gcc`/`Tcc`/`Clang`) is checked against the system
-/// before use — better to fail clearly here than have the compiler
+/// before use - better to fail clearly here than have the compiler
 /// invocation fail later with a confusing "command not found".
 /// `Auto` tries, in priority order: `clang`, `tcc`, the system `cc`,
 /// then `gcc` as a last resort.

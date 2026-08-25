@@ -15,7 +15,7 @@ use clap::{Parser, Subcommand};
 
 /// Top-level CLI definition for the `smidr` binary.
 #[derive(Parser)]
-#[command(name = "Smidr", version = "0.1.0", long_about = None)]
+#[command(name = "Smidr", version = "0.3.0", long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
@@ -52,7 +52,7 @@ pub enum Commands {
     Rebuild,
 
     // TODO: Add:
-    //
+    // Add, // add dependency
     // Remove, // remove dependency
     // Test, // run tests
     // Profile, // profile build

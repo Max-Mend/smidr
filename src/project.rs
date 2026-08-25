@@ -5,7 +5,7 @@
 //! The in-memory model of a `smidr` project.
 //!
 //! [`Project`] is a read-only view of what already exists (or should
-//! exist) on disk - [`Project::load`] reads `smidr.toml` and computes
+//! exist) on disk - [`Project::load`] reads `Smidr.toml` and computes
 //! standard paths, [`Project::source_files`] reads `src/`. Neither
 //! creates or modifies any files. [`Project::init`] is the one exception:
 //! it's the write side, used by `smidr new` to scaffold a brand new
@@ -20,10 +20,13 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 /// Templates for the `smidr new` command.
-const MAIN_C_TEMPLATE: &str = include_str!("../templates/main.c");
 const GITIGNORE_TEMPLATE: &str = include_str!("../templates/.gitignore");
+const MAIN_C_TEMPLATE: &str = include_str!("../templates/main.c");
 const LIB_C_TEMPLATE: &str = include_str!("../templates/lib.c");
 const LIB_H_TEMPLATE: &str = include_str!("../templates/lib.h");
+const MAIN_CPP_TEMPLATE: &str = include_str!("../templates/main.cpp");
+const LIB_CPP_TEMPLATE: &str = include_str!("../templates/lib.cpp");
+const LIB_HPP_TEMPLATE: &str = include_str!("../templates/lib.hpp");
 
 /// A loaded (or freshly initialized) `smidr` project.
 ///
@@ -31,9 +34,9 @@ const LIB_H_TEMPLATE: &str = include_str!("../templates/lib.h");
 /// [`crate::builder::run_project`] take as input, and what accumulates
 /// dependency build results in `resolved_deps` as they're resolved.
 pub struct Project {
-    /// The project's root directory (where `smidr.toml` lives).
+    /// The project's root directory (where `Smidr.toml` lives).
     pub root: PathBuf,
-    /// The fully parsed `smidr.toml` - `[project]`, `[build]`, and
+    /// The fully parsed `Smidr.toml` - `[project]`, `[build]`, and
     /// `[dependencies]`.
     pub config: ManifestConfig,
 
@@ -52,13 +55,13 @@ pub struct Project {
 }
 
 impl Project {
-    /// Load an existing project from `project_dir`: parse `smidr.toml`
+    /// Load an existing project from `project_dir`: parse `Smidr.toml`
     /// and compute the standard `src/`, `target/`, and `target/deps/`
     /// paths relative to it.
     ///
     /// # Errors
     /// Propagates [`BuildError::ManifestNotFound`] or [`BuildError::TomlDe`]
-    /// from [`ManifestConfig::load`] if `smidr.toml` is missing or invalid.
+    /// from [`ManifestConfig::load`] if `Smidr.toml` is missing or invalid.
     pub fn load(project_dir: &Path) -> Result<Self> {
         let config = ManifestConfig::load(project_dir)?;
 
@@ -74,7 +77,7 @@ impl Project {
 
     /// Scaffold a brand new project named `name` in the current directory:
     /// creates `src/`, `include/`, a starter `src/main.c`, a generated
-    /// `smidr.toml`, and a `.gitignore`.
+    /// `Smidr.toml`, and a `.gitignore`.
     ///
     /// # Errors
     /// Returns [`BuildError::InvalidProjectName`] if `name` is empty or
@@ -125,7 +128,8 @@ impl Project {
                 project_type,
                 language: Language::C,
                 c_standard: c_standard.unwrap_or_default(),
-                cpp_standard: Default::default(),
+                cpp_standard: None,
+                output_name: None,
             },
             
             build: BuildSection {

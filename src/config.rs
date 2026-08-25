@@ -28,7 +28,7 @@ pub struct ManifestConfig {
     /// "virtual" workspace-only manifests without a `[project]` section.
     #[serde(default)]
     pub workspace: Option<WorkspacesConfig>,
-    #[serde(default, rename = "bin")]
+    #[serde(default, rename = "bin", skip_serializing_if = "Vec::is_empty")]
     pub extra_bins: Vec<BinTarget>,
 }
 
@@ -43,11 +43,14 @@ pub struct ProjectSection {
     pub language: Language,
     #[serde(default)]
     pub c_standard: CStandard,
-    pub cpp_standard: CppStandard,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cpp_standard: Option<CppStandard>,
     pub authors: Vec<String>,
     pub authors_email: Vec<String>,
     pub description: Option<String>,
     pub license: Option<String>,
+    #[serde(default)]
+    pub output_name: Option<String>,
 }
 
 /// The type of the project, either a binary, static library, or shared library.
@@ -157,8 +160,6 @@ pub struct ProfileSection {
     pub opt_level: OptLevel,
     #[serde(default)]
     pub debug_symbols: bool,
-    #[serde(default)]
-    pub output_name: Option<String>,
 }
 
 /// Optimization level for the build.
@@ -235,10 +236,17 @@ impl ManifestConfig {
     }
 
     /// Serialize this config back into a pretty-printed TOML string, for
-    /// writing out a freshly scaffolded `Smidr.toml` (see
-    /// [`crate::project::Project::init`]).
+    /// writing out a freshly scaffolded `Smidr.toml` 
+    /// (see [`crate::project::Project::init`]).
     pub fn to_toml_string(&self) -> Result<String> {
         Ok(toml::to_string_pretty(self)?)
+    }
+}
+
+impl ProjectSection {
+    /// Returns the explicit `output_name` if configured, falling back to the project `name`.
+    pub fn output_name(&self) -> &str {
+        self.output_name.as_deref().unwrap_or(&self.name)
     }
 }
 
