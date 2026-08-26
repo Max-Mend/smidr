@@ -56,5 +56,9 @@ fn run() -> error::Result<()> {
             let project = project::Project::load(&std::env::current_dir()?)?;
             builder::rebuild_project(&project)
         }
+        Commands::Format => {
+            let project = project::Project::load(&std::env::current_dir()?)?;
+            builder::fmt_project(&project)
+        }
     }
 }

@@ -21,6 +21,15 @@ pub struct ManifestConfig {
     pub project: ProjectSection,
     pub build: BuildSection,
     pub dependencies: BTreeMap<String, DependencySpec>,
+    /// Optional `[workspace]` section: lets this same `Smidr.toml` also
+    /// act as the root of a multi-project workspace, listing paths to
+    /// member projects. A `Smidr.toml` is a normal single project unless
+    /// this is present - this project doesn't (yet) support Cargo-style
+    /// "virtual" workspace-only manifests without a `[project]` section.
+    #[serde(default)]
+    pub workspace: Option<WorkspacesConfig>,
+    #[serde(default, rename = "bin", skip_serializing_if = "Vec::is_empty")]
+    pub extra_bins: Vec<BinTarget>,
 }
 
 /// The `[project]` section: identifying metadata for the project.
@@ -34,11 +43,14 @@ pub struct ProjectSection {
     pub language: Language,
     #[serde(default)]
     pub c_standard: CStandard,
-    pub cpp_standard: CppStandard,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cpp_standard: Option<CppStandard>,
     pub authors: Vec<String>,
     pub authors_email: Vec<String>,
     pub description: Option<String>,
     pub license: Option<String>,
+    #[serde(default)]
+    pub output_name: Option<String>,
 }
 
 /// The type of the project, either a binary, static library, or shared library.
@@ -93,6 +105,13 @@ pub enum CppStandard {
     Cpp26,
 }
 
+/// `[workspace]` section - a list of paths to member projects, each with
+/// its own `Smidr.toml`.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct WorkspacesConfig {
+    pub members: Vec<String>,
+}
+
 /// The `[build]` section: compiler and flag settings used by
 /// [`crate::builder::build_project`].
 #[derive(Deserialize, Serialize)]
@@ -132,6 +151,32 @@ pub struct DependencySpec {
     /// can't report this automatically.
     #[serde(default)]
     pub libs: Vec<String>,
+}
+
+/// The `[profile]` section: compiler and optimization settings.
+#[derive(Deserialize, Serialize, Default)]
+pub struct ProfileSection {
+    #[serde(default)]
+    pub opt_level: OptLevel,
+    #[serde(default)]
+    pub debug_symbols: bool,
+}
+
+/// Optimization level for the build.
+#[derive(Deserialize, Serialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum OptLevel {
+    #[default]
+    None,   // -O0
+    Speed,  // -O2
+    Size,   // -Os
+    Max,    // -O3
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct BinTarget {
+    pub name: String,
+    pub path: String,
 }
 
 /// Which build system to use for a dependency. `Auto` probes the
@@ -191,10 +236,17 @@ impl ManifestConfig {
     }
 
     /// Serialize this config back into a pretty-printed TOML string, for
-    /// writing out a freshly scaffolded `Smidr.toml` (see
-    /// [`crate::project::Project::init`]).
+    /// writing out a freshly scaffolded `Smidr.toml` 
+    /// (see [`crate::project::Project::init`]).
     pub fn to_toml_string(&self) -> Result<String> {
         Ok(toml::to_string_pretty(self)?)
+    }
+}
+
+impl ProjectSection {
+    /// Returns the explicit `output_name` if configured, falling back to the project `name`.
+    pub fn output_name(&self) -> &str {
+        self.output_name.as_deref().unwrap_or(&self.name)
     }
 }
 

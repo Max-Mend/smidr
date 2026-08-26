@@ -7,7 +7,7 @@
 //! Unlike CMake and Meson, a bare Makefile has no standard convention for
 //! an install prefix - this builder does its best (Autotools' `configure
 //! --prefix`, then `make install PREFIX=`), but there's no guarantee a
-//! given Makefile honors either. When it doesn't, the failure message
+//! given Makefile honors either. When it does not, the failure message
 //! points at `build_system = "custom"` as the reliable fallback.
 
 use super::{collect_from_prefix, run, BuildOutput, DepBuilder};
@@ -37,7 +37,7 @@ impl DepBuilder for MakeBuilder {
     ///
     /// # Errors
     /// Returns [`BuildError::Dependency`] if the install step fails,
-    /// since that most likely means this Makefile doesn't support
+    /// since that most likely means this Makefile does not support
     /// `PREFIX=` at all.
     fn build(&self, src_dir: &Path, prefix: &Path) -> Result<BuildOutput> {
         // Autotools convention: if `configure` exists, it determines the

@@ -12,9 +12,10 @@
 //! calling [`crate::resolver`] and [`crate::toolchain`] - isn't wired up
 //! here yet (see the crate's roadmap).
 
+use crate::compile_db::CompileCommand;
+use crate::diagnostics::{print_diagnostic, Diagnostic};
 use crate::error::Result;
 use crate::project::Project;
-use crate::diagnostics::{Diagnostic, print_diagnostic};
 use std::path::PathBuf;
 
 /// A single compiled `.c` file, paired with the exact command used to
@@ -37,7 +38,10 @@ pub struct CompileOptions {
 /// `target/bin/<project-name>`.
 ///
 /// Steps: resolve a compiler ([`compiler_binary`]), compile each source
-/// file to `target/<name>.o`, then link all object files together.
+/// file to `target/<name>.o`, then link all object files together. A
+/// `compile_commands.json` (recording the exact command used for each
+/// file) is written to the project root once all files have compiled
+/// successfully.
 ///
 /// # Errors
 /// Returns [`crate::error::BuildError::CompilerNotFound`] if no usable
@@ -63,6 +67,7 @@ pub fn build_project(project: &Project) -> Result<()> {
     }
 
     let mut object_files: Vec<PathBuf> = Vec::new();
+    let mut compile_commands: Vec<CompileCommand> = Vec::new();
 
     for src in sources {
         let file_stem = src.file_stem().unwrap().to_str().unwrap();
@@ -78,8 +83,12 @@ pub fn build_project(project: &Project) -> Result<()> {
                 .collect::<Vec<_>>(),
         );
         cmd.args(&opts.cflags);
-
         cmd.arg(format!("-std={}", project.config.project.c_standard));
+
+        // Recording the actual command used for this specific file - 
+        // doing it before .output(), while cmd is still available for formatting, 
+        // and after all arguments have been added.
+        let command_str = format!("{:?}", cmd);
 
         let output = cmd.output()?;
         if !output.status.success() {
@@ -99,7 +108,7 @@ pub fn build_project(project: &Project) -> Result<()> {
 
 >>>>>>> dev
             let error_detail = if printed_pretty {
-                "See error details above..".to_string()
+                "See error details above...".to_string()
             } else {
                 stderr.to_string()
             };
@@ -109,18 +118,33 @@ pub fn build_project(project: &Project) -> Result<()> {
                 error_detail,
             ));
         }
+
+        compile_commands.push(CompileCommand {
+            directory: project.root.display().to_string(),
+            file: src.display().to_string(),
+            command: command_str,
+            output: obj_path.display().to_string(),
+        });
+
         object_files.push(obj_path);
     }
 
-    let binary_path = project
-        .build_dir
-        .join("bin")
-        .join(&project.config.project.name);
+    crate::compile_db::write(&compile_commands, &project.root.join("compile_commands.json"))?;
+
+    let binary_path = project.build_dir.join("bin").join(
+        project
+            .config
+            .project
+            .output_name
+            .as_ref()
+            .unwrap_or(&project.config.project.name),
+    );
     std::fs::create_dir_all(project.build_dir.join("bin"))?;
 
     let mut link_cmd = std::process::Command::new(&opts.compiler);
     link_cmd.args(&object_files);
     link_cmd.arg("-o").arg(&binary_path);
+    link_cmd.args(project.config.build.libs.iter().map(|l| format!("-l{}", l)));
 
     let output = link_cmd.output()?;
     if !output.status.success() {
@@ -141,10 +165,14 @@ pub fn build_project(project: &Project) -> Result<()> {
 /// exits with a non-zero status.
 pub fn run_project(project: &Project) -> Result<()> {
     build_project(project)?;
-    let binary_path = project
-        .build_dir
-        .join("bin")
-        .join(&project.config.project.name);
+    let binary_path = project.build_dir.join("bin").join(
+        project
+            .config
+            .project
+            .output_name
+            .as_ref()
+            .unwrap_or(&project.config.project.name),
+    );
 
     println!("Running: {}", binary_path.display());
     let status = std::process::Command::new(&binary_path).status()?;
@@ -178,12 +206,50 @@ pub fn rebuild_project(project: &Project) -> Result<()> {
     build_project(project)
 }
 
+/// Format project source and header files with clang-format.
+///
+/// # Errors
+/// Returns [crate::error::BuildError::CompilerNotFound] if
+/// clang-format isn't on PATH. Returns
+/// [crate::error::BuildError::CommandFailed] if clang-format exits
+/// with a non-zero status.
+pub fn fmt_project(project: &Project) -> Result<()> {
+    if !command_exists("clang-format") {
+        return Err(crate::error::BuildError::ToolNotFound {
+            tool: "clang-format".to_string(),
+            hint: "Install it via your package manager (e.g. `apt install clang-format`)."
+                .to_string(),
+        });
+    }
+
+    let files = project.formattable_files()?;
+    if files.is_empty() {
+        println!("Nothing to format.");
+        return Ok(());
+    }
+
+    let mut cmd = std::process::Command::new("clang-format");
+    cmd.arg("-i");
+    cmd.args(&files);
+
+    let status = cmd.status()?;
+    if !status.success() {
+        return Err(crate::error::BuildError::CommandFailed {
+            cmd: "clang-format".to_string(),
+            code: status.code(),
+        });
+    }
+
+    println!("Formatted {} file(s).", files.len());
+    Ok(())
+}
+
 /// Resolve a [`crate::config::CompilerKind`] into an actual compiler
 /// binary name, verifying it's runnable rather than trusting the config
 /// blindly.
 ///
 /// An explicit choice (`Gcc`/`Tcc`/`Clang`) is checked against the system
-/// before use — better to fail clearly here than have the compiler
+/// before use - better to fail clearly here than have the compiler
 /// invocation fail later with a confusing "command not found".
 /// `Auto` tries, in priority order: `clang`, `tcc`, the system `cc`,
 /// then `gcc` as a last resort.
@@ -197,7 +263,7 @@ fn compiler_binary(kind: &crate::config::CompilerKind) -> Result<&'static str> {
 
     match kind {
         CompilerKind::Gcc => {
-            if compiler_exists("gcc") {
+            if command_exists("gcc") {
                 Ok("gcc")
             } else {
                 Err(crate::error::BuildError::CompilerNotFound(
@@ -206,7 +272,7 @@ fn compiler_binary(kind: &crate::config::CompilerKind) -> Result<&'static str> {
             }
         }
         CompilerKind::Tcc => {
-            if compiler_exists("tcc") {
+            if command_exists("tcc") {
                 Ok("tcc")
             } else {
                 Err(crate::error::BuildError::CompilerNotFound(
@@ -215,7 +281,7 @@ fn compiler_binary(kind: &crate::config::CompilerKind) -> Result<&'static str> {
             }
         }
         CompilerKind::Clang => {
-            if compiler_exists("clang") {
+            if command_exists("clang") {
                 Ok("clang")
             } else {
                 Err(crate::error::BuildError::CompilerNotFound(
@@ -225,7 +291,7 @@ fn compiler_binary(kind: &crate::config::CompilerKind) -> Result<&'static str> {
         }
         CompilerKind::Auto => {
             for candidate in ["clang", "tcc", "cc", "gcc"] {
-                if compiler_exists(candidate) {
+                if command_exists(candidate) {
                     return Ok(candidate);
                 }
             }
@@ -238,7 +304,7 @@ fn compiler_binary(kind: &crate::config::CompilerKind) -> Result<&'static str> {
 
 /// Check whether `name` is a runnable compiler on `PATH`, by attempting
 /// to run `<name> --version` and discarding its output.
-fn compiler_exists(name: &str) -> bool {
+fn command_exists(name: &str) -> bool {
     std::process::Command::new(name)
         .arg("--version")
         .stdout(std::process::Stdio::null())

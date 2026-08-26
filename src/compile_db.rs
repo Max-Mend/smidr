@@ -8,8 +8,7 @@
 //!
 //! This module only knows how to serialize a list of entries to disk -
 //! building that list from the actual compile commands run during a
-//! build is [`crate::builder`]'s job (not yet wired up; see the crate's
-//! roadmap).
+//! build is [`crate::builder`]'s job.
 
 use crate::error::Result;
 use serde::Serialize;
