@@ -102,11 +102,6 @@ pub fn build_project(project: &Project) -> Result<()> {
                     break;
                 }
             }
-<<<<<<< HEAD
-            
-=======
-
->>>>>>> dev
             let error_detail = if printed_pretty {
                 "See error details above...".to_string()
             } else {
