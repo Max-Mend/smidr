@@ -7,7 +7,7 @@ description = "Smidr is a cargo-inspired build tool for C projects, meant to bri
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Max-Mend/smidr"
 readme = "README.md"
-keywords = ["c", "build-tool", "cli", "cmake", "compiler", "meson", "build-system", "developer-tools"]
+keywords = ["c", "build-tool", "cli", "compiler", "build-system"]
 categories = ["development-tools", "command-line-utilities"]
 
 [dependencies]
