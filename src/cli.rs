@@ -25,6 +25,7 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     /// Scaffold a new project.
+    #[command(alias = "n")]
     New {
         name: String,
         /// Explicit project kind: `static` or `dynamic`. Cannot be
@@ -43,17 +44,20 @@ pub enum Commands {
         std: Option<CStandard>,
     },
     /// Compile the current project.
+    #[command(alias = "b")]
     Build,
     /// Compile and run the current project.
+    #[command(alias = "r")]
     Run,
     /// Remove the `target/` build directory.
-    #[command(alias = "clean")]
-    Cl,
+    #[command(alias = "cl")]
+    Clean,
     /// Clean, then compile the current project from scratch.
+    #[command(alias = "rb")]
     Rebuild,
     /// Format project source and header files with clang-format.
-    #[command(alias = "format")]
-    Fmt,
+    #[command(alias = "fmt")]
+    Format,
 
     // TODO: Add:
     // Add, // add dependency

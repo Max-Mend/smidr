@@ -59,6 +59,10 @@ pub enum BuildError {
     #[error("Cleaned target directory: {0}")]
     Clean(String),
 
+    /// A tool was not found.
+    #[error("'{tool}' not found. {hint}")]
+    ToolNotFound { tool: String, hint: String },
+
     // ---- Config (config.rs) ----
     /// Failed to serialize a [`crate::config::ManifestConfig`] back to TOML
     /// (used by `smidr new` when writing the generated `Smidr.toml`).

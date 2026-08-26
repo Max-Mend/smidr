@@ -48,7 +48,7 @@ fn run() -> error::Result<()> {
             let project = project::Project::load(&std::env::current_dir()?)?;
             builder::run_project(&project)
         }
-        Commands::Cl => {
+        Commands::Clean => {
             let project = project::Project::load(&std::env::current_dir()?)?;
             builder::clean_project(&project)
         }
@@ -56,7 +56,7 @@ fn run() -> error::Result<()> {
             let project = project::Project::load(&std::env::current_dir()?)?;
             builder::rebuild_project(&project)
         }
-        Commands::Fmt => {
+        Commands::Format => {
             let project = project::Project::load(&std::env::current_dir()?)?;
             builder::fmt_project(&project)
         }

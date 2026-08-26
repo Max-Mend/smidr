@@ -211,9 +211,11 @@ pub fn rebuild_project(project: &Project) -> Result<()> {
 /// with a non-zero status.
 pub fn fmt_project(project: &Project) -> Result<()> {
     if !command_exists("clang-format") {
-        return Err(crate::error::BuildError::CompilerNotFound(
-            "clang-format".to_string(),
-        ));
+        return Err(crate::error::BuildError::ToolNotFound {
+            tool: "clang-format".to_string(),
+            hint: "Install it via your package manager (e.g. `apt install clang-format`)."
+                .to_string(),
+        });
     }
 
     let files = project.formattable_files()?;
