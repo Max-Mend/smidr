@@ -1,14 +1,26 @@
 [package]
 name = "smidr"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 authors = ["Max-Mend"]
 description = "Smidr is a cargo-inspired build tool for C projects, meant to bridge dependencies across different build systems into a single build."
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Max-Mend/smidr"
 readme = "README.md"
-keywords = ["c", "build-tool", "cli", "cmake", "compiler", "meson", "build-system", "developer-tools"]
+keywords = [
+    "c",
+    "build-tool",
+    "cli",
+    "compiler",
+    "build-system",
+]
 categories = ["development-tools", "command-line-utilities"]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
 
 [dependencies]
 ariadne = "0.6.0"

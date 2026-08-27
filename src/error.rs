@@ -55,6 +55,10 @@ pub enum BuildError {
     #[error("No .c files found in src/")]
     NoSourceFiles,
 
+    /// `include/` exists but contains no `.h` files to compile.
+    #[error("No .h files found in include/")]
+    NoHeaderFiles,
+
     /// Cleaned target directory.
     #[error("Cleaned target directory: {0}")]
     Clean(String),

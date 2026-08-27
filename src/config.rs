@@ -28,6 +28,8 @@ pub struct ManifestConfig {
     /// "virtual" workspace-only manifests without a `[project]` section.
     #[serde(default)]
     pub workspace: Option<WorkspacesConfig>,
+    #[serde(default)]
+    pub profile: ProfilesSection,
     #[serde(default, rename = "bin", skip_serializing_if = "Vec::is_empty")]
     pub extra_bins: Vec<BinTarget>,
 }
@@ -153,17 +155,30 @@ pub struct DependencySpec {
     pub libs: Vec<String>,
 }
 
-/// The `[profile]` section: compiler and optimization settings.
-#[derive(Deserialize, Serialize, Default)]
+/// The `[profile]` section in Smidr.toml. (All fields optional)
+#[derive(Debug, Clone, Deserialize, Serialize, Default, PartialEq, Eq)]
+pub struct ProfilesSection {
+    pub debug: Option<ProfileSection>,
+    pub release: Option<ProfileSection>,
+}
+
+/// The `[profile.debug]` and `[profile.release]` sections in Smidr.toml. (All fields optional)
+#[derive(Debug, Clone, Deserialize, Serialize, Default, PartialEq, Eq)]
 pub struct ProfileSection {
     #[serde(default)]
     pub opt_level: OptLevel,
     #[serde(default)]
+    pub warnings: WarningLevel,
+    #[serde(default)]
     pub debug_symbols: bool,
+    #[serde(default)]
+    pub lto: bool,
+    #[serde(default)]
+    pub strip: bool,
 }
 
 /// Optimization level for the build.
-#[derive(Deserialize, Serialize, Default)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum OptLevel {
     #[default]
@@ -171,6 +186,16 @@ pub enum OptLevel {
     Speed,  // -O2
     Size,   // -Os
     Max,    // -O3
+}
+
+/// Compiler warning level, translated into concrete flags by
+/// `builder.rs` (`-Wall -Wextra`, plus `-Werror -Wpedantic` for `Strict`).
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq, Eq)]
+pub enum WarningLevel {
+    None,
+    #[default]
+    Standard,
+    Strict,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -205,16 +230,6 @@ pub enum CompilerKind {
     Clang,
 }
 
-/// Compiler warning level, translated into concrete flags by
-/// `builder.rs` (`-Wall -Wextra`, plus `-Werror -Wpedantic` for `Strict`).
-#[derive(Deserialize, Serialize, Default)]
-pub enum WarningLevel {
-    None,
-    #[default]
-    Standard,
-    Strict,
-}
-
 impl ManifestConfig {
     /// Read and parse `Smidr.toml` from `project_dir`.
     ///
@@ -240,6 +255,28 @@ impl ManifestConfig {
     /// (see [`crate::project::Project::init`]).
     pub fn to_toml_string(&self) -> Result<String> {
         Ok(toml::to_string_pretty(self)?)
+    }
+
+    /// Returns the effective release profile, using defaults if not specified.
+    pub fn get_release_profile(&self) -> ProfileSection {
+        self.profile.release.clone().unwrap_or(ProfileSection {
+            opt_level: OptLevel::Max,
+            debug_symbols: false,
+            warnings: WarningLevel::Strict,
+            lto: true,
+            strip: false,
+        })
+    }
+
+    /// Returns the effective debug profile, using defaults if not specified.
+    pub fn get_debug_profile(&self) -> ProfileSection {
+        self.profile.debug.clone().unwrap_or(ProfileSection {
+            opt_level: OptLevel::None,
+            debug_symbols: true,
+            warnings: WarningLevel::Standard,
+            lto: false,
+            strip: false,
+        })
     }
 }
 
