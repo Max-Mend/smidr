@@ -133,7 +133,6 @@ impl Project {
             
             build: BuildSection {
                 compiler: Default::default(),
-                warnings: Default::default(),
                 cflags: Vec::new(),
                 libs: Vec::new(),
             },

@@ -45,16 +45,25 @@ pub enum Commands {
     },
     /// Compile the current project.
     #[command(alias = "b")]
-    Build,
+    Build {
+        #[arg(long)]
+        release: bool,
+    },
     /// Compile and run the current project.
     #[command(alias = "r")]
-    Run,
+    Run {
+        #[arg(long)]
+        release: bool,
+    },
     /// Remove the `target/` build directory.
     #[command(alias = "cl")]
     Clean,
     /// Clean, then compile the current project from scratch.
     #[command(alias = "rb")]
-    Rebuild,
+    Rebuild {
+        #[arg(long)]
+        release: bool,
+    },
     /// Format project source and header files with clang-format.
     #[command(alias = "fmt")]
     Format,

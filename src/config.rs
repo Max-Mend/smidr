@@ -119,7 +119,6 @@ pub struct WorkspacesConfig {
 #[derive(Deserialize, Serialize)]
 pub struct BuildSection {
     pub compiler: CompilerKind,
-    pub warnings: WarningLevel,
     pub cflags: Vec<String>,
     pub libs: Vec<String>,
 }
@@ -165,15 +164,25 @@ pub struct ProfilesSection {
 /// The `[profile.debug]` and `[profile.release]` sections in Smidr.toml. (All fields optional)
 #[derive(Debug, Clone, Deserialize, Serialize, Default, PartialEq, Eq)]
 pub struct ProfileSection {
-    #[serde(default)]
+    pub opt_level: Option<OptLevel>,
+    pub warnings: Option<WarningLevel>,
+    pub debug_symbols: Option<bool>,
+    pub lto: Option<bool>,
+    pub strip: Option<bool>,
+}
+
+/// The effective, fully-resolved settings for a build profile - every
+/// field filled in, either from the user's `[profile.debug]`/
+/// `[profile.release]` in `Smidr.toml`, or from the profile's built-in
+/// defaults. This is what `builder::build_project` actually reads;
+/// [`ProfileSection`] (all-`Option`) is only the on-disk, possibly-partial
+/// representation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResolvedProfile {
     pub opt_level: OptLevel,
-    #[serde(default)]
     pub warnings: WarningLevel,
-    #[serde(default)]
     pub debug_symbols: bool,
-    #[serde(default)]
     pub lto: bool,
-    #[serde(default)]
     pub strip: bool,
 }
 
@@ -258,25 +267,39 @@ impl ManifestConfig {
     }
 
     /// Returns the effective release profile, using defaults if not specified.
-    pub fn get_release_profile(&self) -> ProfileSection {
-        self.profile.release.clone().unwrap_or(ProfileSection {
-            opt_level: OptLevel::Max,
-            debug_symbols: false,
-            warnings: WarningLevel::Strict,
-            lto: true,
-            strip: false,
-        })
+    pub fn get_release_profile(&self) -> ResolvedProfile {
+        let user_profile = self.profile.release.as_ref();
+        ResolvedProfile {
+            opt_level: user_profile
+                .and_then(|p| p.opt_level)
+                .unwrap_or(OptLevel::Max),
+            warnings: user_profile
+                .and_then(|p| p.warnings)
+                .unwrap_or(WarningLevel::Strict),
+            debug_symbols: user_profile
+                .and_then(|p| p.debug_symbols)
+                .unwrap_or(false),
+            lto: user_profile.and_then(|p| p.lto).unwrap_or(true),
+            strip: user_profile.and_then(|p| p.strip).unwrap_or(false),
+        }
     }
 
     /// Returns the effective debug profile, using defaults if not specified.
-    pub fn get_debug_profile(&self) -> ProfileSection {
-        self.profile.debug.clone().unwrap_or(ProfileSection {
-            opt_level: OptLevel::None,
-            debug_symbols: true,
-            warnings: WarningLevel::Standard,
-            lto: false,
-            strip: false,
-        })
+    pub fn get_debug_profile(&self) -> ResolvedProfile {
+        let user_profile = self.profile.debug.as_ref();
+        ResolvedProfile {
+            opt_level: user_profile
+                .and_then(|p| p.opt_level)
+                .unwrap_or(OptLevel::None),
+            warnings: user_profile
+                .and_then(|p| p.warnings)
+                .unwrap_or(WarningLevel::Standard),
+            debug_symbols: user_profile
+                .and_then(|p| p.debug_symbols)
+                .unwrap_or(true),
+            lto: user_profile.and_then(|p| p.lto).unwrap_or(false),
+            strip: user_profile.and_then(|p| p.strip).unwrap_or(false),
+        }
     }
 }
 

@@ -40,21 +40,21 @@ fn run() -> error::Result<()> {
             };
             project::Project::init(name, project_type, std.clone())
         }
-        Commands::Build => {
+        Commands::Build { release } => {
             let project = project::Project::load(&std::env::current_dir()?)?;
-            builder::build_project(&project)
+            builder::build_project(&project, *release)
         }
-        Commands::Run => {
+        Commands::Run { release } => {
             let project = project::Project::load(&std::env::current_dir()?)?;
-            builder::run_project(&project)
+            builder::run_project(&project, *release)
         }
         Commands::Clean => {
             let project = project::Project::load(&std::env::current_dir()?)?;
             builder::clean_project(&project)
         }
-        Commands::Rebuild => {
+        Commands::Rebuild { release } => {
             let project = project::Project::load(&std::env::current_dir()?)?;
-            builder::rebuild_project(&project)
+            builder::rebuild_project(&project, *release)
         }
         Commands::Format => {
             let project = project::Project::load(&std::env::current_dir()?)?;
