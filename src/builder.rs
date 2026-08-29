@@ -48,12 +48,21 @@ pub struct CompileOptions {
 /// compiler is found, [`crate::error::BuildError::Compile`] if a source
 /// file fails to compile, or [`crate::error::BuildError::Link`] if the
 /// final link step fails.
-pub fn build_project(project: &Project) -> Result<()> {
+pub fn build_project(project: &Project, release: bool) -> Result<()> {
     let sources = project.source_files()?;
-    std::fs::create_dir_all(&project.build_dir)?;
+
+    let profile_dir = if release { "release" } else { "debug" };
+    let build_dir = project.build_dir.join(profile_dir);
+    std::fs::create_dir_all(&build_dir)?;
 
     let compiler = compiler_binary(&project.config.build.compiler)?;
     println!("Using compiler: {}", compiler);
+
+    let profile = if release {
+        project.config.get_release_profile()
+    } else {
+        project.config.get_debug_profile()
+    };
 
     let mut opts = CompileOptions {
         compiler: compiler.to_string(),
@@ -71,7 +80,7 @@ pub fn build_project(project: &Project) -> Result<()> {
 
     for src in sources {
         let file_stem = src.file_stem().unwrap().to_str().unwrap();
-        let obj_path = project.build_dir.join(format!("{}.o", file_stem));
+        let obj_path = build_dir.join(format!("{}.o", file_stem));
 
         let mut cmd = std::process::Command::new(&opts.compiler);
         cmd.arg("-c").arg(&src).arg("-o").arg(&obj_path);
@@ -82,7 +91,15 @@ pub fn build_project(project: &Project) -> Result<()> {
                 .map(|p| format!("-I{}", p.display()))
                 .collect::<Vec<_>>(),
         );
-        cmd.args(&opts.cflags);
+        cmd.arg(match profile.opt_level {
+            crate::config::OptLevel::None => "-O0",
+            crate::config::OptLevel::Speed => "-O2",
+            crate::config::OptLevel::Size => "-Os",
+            crate::config::OptLevel::Max => "-O3",
+        });
+        if profile.debug_symbols {
+            cmd.arg("-g");
+        }
         cmd.arg(format!("-std={}", project.config.project.c_standard));
 
         // Recording the actual command used for this specific file - 
@@ -126,7 +143,7 @@ pub fn build_project(project: &Project) -> Result<()> {
 
     crate::compile_db::write(&compile_commands, &project.root.join("compile_commands.json"))?;
 
-    let binary_path = project.build_dir.join("bin").join(
+    let binary_path = build_dir.join("bin").join(
         project
             .config
             .project
@@ -134,12 +151,19 @@ pub fn build_project(project: &Project) -> Result<()> {
             .as_ref()
             .unwrap_or(&project.config.project.name),
     );
-    std::fs::create_dir_all(project.build_dir.join("bin"))?;
+    std::fs::create_dir_all(build_dir.join("bin"))?;
 
     let mut link_cmd = std::process::Command::new(&opts.compiler);
     link_cmd.args(&object_files);
     link_cmd.arg("-o").arg(&binary_path);
     link_cmd.args(project.config.build.libs.iter().map(|l| format!("-l{}", l)));
+
+    if profile.lto {
+        link_cmd.arg("-flto");
+    }
+    if profile.strip {
+        link_cmd.arg("-s");
+    }
 
     let output = link_cmd.output()?;
     if !output.status.success() {
@@ -158,9 +182,10 @@ pub fn build_project(project: &Project) -> Result<()> {
 /// Propagates any error from [`build_project`]. Returns
 /// [`crate::error::BuildError::CommandFailed`] if the binary itself
 /// exits with a non-zero status.
-pub fn run_project(project: &Project) -> Result<()> {
-    build_project(project)?;
-    let binary_path = project.build_dir.join("bin").join(
+pub fn run_project(project: &Project, release: bool) -> Result<()> {
+    build_project(project, release)?;
+    let profile_dir = if release { "release" } else { "debug" };
+     let binary_path = project.build_dir.join(profile_dir).join("bin").join(
         project
             .config
             .project
@@ -196,9 +221,9 @@ pub fn clean_project(project: &Project) -> Result<()> {
     Ok(())
 }
 
-pub fn rebuild_project(project: &Project) -> Result<()> {
+pub fn rebuild_project(project: &Project, release: bool) -> Result<()> {
     clean_project(project)?;
-    build_project(project)
+    build_project(project, release)
 }
 
 /// Format project source and header files with clang-format.

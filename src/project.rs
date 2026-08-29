@@ -133,12 +133,12 @@ impl Project {
             
             build: BuildSection {
                 compiler: Default::default(),
-                warnings: Default::default(),
                 cflags: Vec::new(),
                 libs: Vec::new(),
             },
             dependencies: BTreeMap::new(),
             workspace: None,
+            profile: Default::default(),
             extra_bins: Vec::new(),
         };
         std::fs::write(root.join("Smidr.toml"), config.to_toml_string()?)?;
@@ -189,6 +189,14 @@ impl Project {
             return Err(BuildError::NoSourceFiles);
         }
         Ok(sources)
+    }
+
+    pub fn header_files(&self) -> Result<Vec<PathBuf>> {
+        let headers = self.collect_files(&[&self.root.join("include")], &["h", "hpp", "hh"])?;
+        if headers.is_empty() {
+            return Err(BuildError::NoHeaderFiles);
+        }
+        Ok(headers)
     }
 
     /// Finds all source and header files in `src_dir` and `include` for formatting.

@@ -55,6 +55,10 @@ pub enum BuildError {
     #[error("No .c files found in src/")]
     NoSourceFiles,
 
+    /// `include/` exists but contains no `.h` files to compile.
+    #[error("No .h files found in include/")]
+    NoHeaderFiles,
+
     /// Cleaned target directory.
     #[error("Cleaned target directory: {0}")]
     Clean(String),
@@ -92,7 +96,7 @@ pub enum BuildError {
     /// `build_system = "auto"` was set for a dependency, but none of the
     /// supported build systems (CMake, Meson, Make) could be detected in
     /// its source directory.
-    #[error("Could not detect build system for '{0}' - specify build_system in smidr.toml")]
+    #[error("Could not detect build system for '{0}' - specify build_system in Smidr.toml")]
     BuildSystemDetectionFailed(String),
 
     /// A dependency-specific failure that doesn't fit the more specific

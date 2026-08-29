@@ -28,6 +28,8 @@ pub struct ManifestConfig {
     /// "virtual" workspace-only manifests without a `[project]` section.
     #[serde(default)]
     pub workspace: Option<WorkspacesConfig>,
+    #[serde(default, skip_serializing_if = "ProfilesSection::is_empty")]
+    pub profile: ProfilesSection,
     #[serde(default, rename = "bin", skip_serializing_if = "Vec::is_empty")]
     pub extra_bins: Vec<BinTarget>,
 }
@@ -117,7 +119,6 @@ pub struct WorkspacesConfig {
 #[derive(Deserialize, Serialize)]
 pub struct BuildSection {
     pub compiler: CompilerKind,
-    pub warnings: WarningLevel,
     pub cflags: Vec<String>,
     pub libs: Vec<String>,
 }
@@ -153,17 +154,40 @@ pub struct DependencySpec {
     pub libs: Vec<String>,
 }
 
-/// The `[profile]` section: compiler and optimization settings.
-#[derive(Deserialize, Serialize, Default)]
+/// The `[profile]` section in Smidr.toml. (All fields optional)
+#[derive(Debug, Clone, Deserialize, Serialize, Default, PartialEq, Eq)]
+pub struct ProfilesSection {
+    pub debug: Option<ProfileSection>,
+    pub release: Option<ProfileSection>,
+}
+
+/// The `[profile.debug]` and `[profile.release]` sections in Smidr.toml. (All fields optional)
+#[derive(Debug, Clone, Deserialize, Serialize, Default, PartialEq, Eq)]
 pub struct ProfileSection {
-    #[serde(default)]
+    pub opt_level: Option<OptLevel>,
+    pub warnings: Option<WarningLevel>,
+    pub debug_symbols: Option<bool>,
+    pub lto: Option<bool>,
+    pub strip: Option<bool>,
+}
+
+/// The effective, fully-resolved settings for a build profile - every
+/// field filled in, either from the user's `[profile.debug]`/
+/// `[profile.release]` in `Smidr.toml`, or from the profile's built-in
+/// defaults. This is what `builder::build_project` actually reads;
+/// [`ProfileSection`] (all-`Option`) is only the on-disk, possibly-partial
+/// representation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResolvedProfile {
     pub opt_level: OptLevel,
-    #[serde(default)]
+    pub warnings: WarningLevel,
     pub debug_symbols: bool,
+    pub lto: bool,
+    pub strip: bool,
 }
 
 /// Optimization level for the build.
-#[derive(Deserialize, Serialize, Default)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum OptLevel {
     #[default]
@@ -171,6 +195,16 @@ pub enum OptLevel {
     Speed,  // -O2
     Size,   // -Os
     Max,    // -O3
+}
+
+/// Compiler warning level, translated into concrete flags by
+/// `builder.rs` (`-Wall -Wextra`, plus `-Werror -Wpedantic` for `Strict`).
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq, Eq)]
+pub enum WarningLevel {
+    None,
+    #[default]
+    Standard,
+    Strict,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -205,16 +239,6 @@ pub enum CompilerKind {
     Clang,
 }
 
-/// Compiler warning level, translated into concrete flags by
-/// `builder.rs` (`-Wall -Wextra`, plus `-Werror -Wpedantic` for `Strict`).
-#[derive(Deserialize, Serialize, Default)]
-pub enum WarningLevel {
-    None,
-    #[default]
-    Standard,
-    Strict,
-}
-
 impl ManifestConfig {
     /// Read and parse `Smidr.toml` from `project_dir`.
     ///
@@ -241,12 +265,57 @@ impl ManifestConfig {
     pub fn to_toml_string(&self) -> Result<String> {
         Ok(toml::to_string_pretty(self)?)
     }
+
+    /// Returns the effective release profile, using defaults if not specified.
+    pub fn get_release_profile(&self) -> ResolvedProfile {
+        let user_profile = self.profile.release.as_ref();
+        ResolvedProfile {
+            opt_level: user_profile
+                .and_then(|p| p.opt_level)
+                .unwrap_or(OptLevel::Max),
+            warnings: user_profile
+                .and_then(|p| p.warnings)
+                .unwrap_or(WarningLevel::Strict),
+            debug_symbols: user_profile
+                .and_then(|p| p.debug_symbols)
+                .unwrap_or(false),
+            lto: user_profile.and_then(|p| p.lto).unwrap_or(true),
+            strip: user_profile.and_then(|p| p.strip).unwrap_or(false),
+        }
+    }
+
+    /// Returns the effective debug profile, using defaults if not specified.
+    pub fn get_debug_profile(&self) -> ResolvedProfile {
+        let user_profile = self.profile.debug.as_ref();
+        ResolvedProfile {
+            opt_level: user_profile
+                .and_then(|p| p.opt_level)
+                .unwrap_or(OptLevel::None),
+            warnings: user_profile
+                .and_then(|p| p.warnings)
+                .unwrap_or(WarningLevel::Standard),
+            debug_symbols: user_profile
+                .and_then(|p| p.debug_symbols)
+                .unwrap_or(true),
+            lto: user_profile.and_then(|p| p.lto).unwrap_or(false),
+            strip: user_profile.and_then(|p| p.strip).unwrap_or(false),
+        }
+    }
 }
 
 impl ProjectSection {
     /// Returns the explicit `output_name` if configured, falling back to the project `name`.
     pub fn output_name(&self) -> &str {
         self.output_name.as_deref().unwrap_or(&self.name)
+    }
+}
+
+impl ProfilesSection {
+    /// Returns `true` if no profile settings are specified (both `debug` and `release` are `None`).
+    ///
+    /// This is used by `toml::to_string_pretty` to decide whether to serialize the `profile` field
+    pub fn is_empty(&self) -> bool {
+        self.debug.is_none() && self.release.is_none()
     }
 }
 
