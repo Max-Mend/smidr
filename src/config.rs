@@ -28,7 +28,7 @@ pub struct ManifestConfig {
     /// "virtual" workspace-only manifests without a `[project]` section.
     #[serde(default)]
     pub workspace: Option<WorkspacesConfig>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "ProfilesSection::is_empty")]
     pub profile: ProfilesSection,
     #[serde(default, rename = "bin", skip_serializing_if = "Vec::is_empty")]
     pub extra_bins: Vec<BinTarget>,
@@ -307,6 +307,15 @@ impl ProjectSection {
     /// Returns the explicit `output_name` if configured, falling back to the project `name`.
     pub fn output_name(&self) -> &str {
         self.output_name.as_deref().unwrap_or(&self.name)
+    }
+}
+
+impl ProfilesSection {
+    /// Returns `true` if no profile settings are specified (both `debug` and `release` are `None`).
+    ///
+    /// This is used by `toml::to_string_pretty` to decide whether to serialize the `profile` field
+    pub fn is_empty(&self) -> bool {
+        self.debug.is_none() && self.release.is_none()
     }
 }
 
