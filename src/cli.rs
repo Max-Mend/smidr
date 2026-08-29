@@ -71,8 +71,6 @@ pub enum Commands {
     // TODO: Add:
     // Add, // add dependency
     // Remove, // remove dependency
-    // Test, // run tests
-    // Profile, // profile build
     // Analyze, // analyze code
     // Lint, // lint code
     // Update, // update smidr
