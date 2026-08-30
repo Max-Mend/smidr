@@ -41,11 +41,13 @@ fn run() -> error::Result<()> {
             project::Project::init(name, project_type, std.clone())
         }
         Commands::Build { release } => {
-            let project = project::Project::load(&std::env::current_dir()?)?;
+            let mut project = project::Project::load(&std::env::current_dir()?)?;
+            project.resolve_dependencies()?;
             builder::build_project(&project, *release)
         }
         Commands::Run { release } => {
-            let project = project::Project::load(&std::env::current_dir()?)?;
+            let mut project = project::Project::load(&std::env::current_dir()?)?;
+            project.resolve_dependencies()?;
             builder::run_project(&project, *release)
         }
         Commands::Clean => {
@@ -53,7 +55,8 @@ fn run() -> error::Result<()> {
             builder::clean_project(&project)
         }
         Commands::Rebuild { release } => {
-            let project = project::Project::load(&std::env::current_dir()?)?;
+            let mut project = project::Project::load(&std::env::current_dir()?)?;
+            project.resolve_dependencies()?;
             builder::rebuild_project(&project, *release)
         }
         Commands::Format => {

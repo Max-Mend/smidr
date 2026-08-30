@@ -15,9 +15,10 @@
 
 use crate::config::{BuildSection, CStandard, Language, ManifestConfig, ProjectSection, ProjectType};
 use crate::error::{BuildError, Result};
-use crate::toolchain::BuildOutput;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use crate::resolver::{self, SourceLocation};
+use crate::toolchain::BuildOutput;
 
 const GITIGNORE_TEMPLATE: &str = include_str!("../templates/.gitignore");
 const MAIN_C_TEMPLATE: &str = include_str!("../templates/main.c");
@@ -135,6 +136,7 @@ impl Project {
                 compiler: Default::default(),
                 cflags: Vec::new(),
                 libs: Vec::new(),
+                linker_flags: Vec::new(),
             },
             dependencies: BTreeMap::new(),
             workspace: None,
@@ -193,7 +195,7 @@ impl Project {
 
     pub fn header_files(&self) -> Result<Vec<PathBuf>> {
         let headers = self.collect_files(&[&self.root.join("include")], &["h", "hpp", "hh"])?;
-        if headers.is_empty() {
+        if headers.is_empty() && self.config.project.project_type == ProjectType::StaticLibrary {
             return Err(BuildError::NoHeaderFiles);
         }
         Ok(headers)
@@ -213,5 +215,38 @@ impl Project {
     /// `include/` and `lib/` output.
     pub fn dep_prefix(&self, dep_name: &str) -> PathBuf {
         self.install_dir.join(dep_name)
+    }
+
+    /// Resolve every entry in `[dependencies]` and populate `resolved_deps`.
+    ///
+    /// For now, only `Version` (system library) specs are handled -
+    /// `path`/`git` wiring into an actual build comes later.
+    pub fn resolve_dependencies(&mut self) -> Result<()> {
+        for (name, spec) in &self.config.dependencies {
+            match resolver::resolve(name, spec, &self.root)? {
+                SourceLocation::System { .. } => {
+                    let lib_info = resolver::resolve_system_lib(name)?;
+                    self.resolved_deps.push((
+                        name.clone(),
+                        BuildOutput {
+                            include_dirs: lib_info.cflags.iter()
+                                .filter_map(|f| f.strip_prefix("-I").map(PathBuf::from))
+                                .collect(),
+                            lib_dirs: Vec::new(),
+                            libs: lib_info.libs.iter()
+                                .filter_map(|f| f.strip_prefix("-l").map(String::from))
+                                .collect(),
+                        },
+                    ));
+                }
+                SourceLocation::Path(_) => {
+                    // TODO: recursive build of path dependency
+                }
+                SourceLocation::Git { .. } => {
+                    // git not supported yet
+                }
+            }
+        }
+        Ok(())
     }
 }

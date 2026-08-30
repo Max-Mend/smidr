@@ -13,7 +13,7 @@
 //! here yet (see the crate's roadmap).
 
 use crate::compile_db::CompileCommand;
-use crate::diagnostics::{print_diagnostic, Diagnostic};
+use crate::diagnostics::{Diagnostic, print_diagnostic};
 use crate::error::Result;
 use crate::project::Project;
 use std::path::PathBuf;
@@ -32,6 +32,8 @@ pub struct CompileOptions {
     compiler: String,
     includes: Vec<PathBuf>,
     cflags: Vec<String>,
+    dep_libs: Vec<String>,
+    dep_lib_dirs: Vec<PathBuf>,
 }
 
 /// Compile every `.c` file in `project` and link them into a binary at
@@ -50,6 +52,7 @@ pub struct CompileOptions {
 /// final link step fails.
 pub fn build_project(project: &Project, release: bool) -> Result<()> {
     let sources = project.source_files()?;
+    project.header_files()?;
 
     let profile_dir = if release { "release" } else { "debug" };
     let build_dir = project.build_dir.join(profile_dir);
@@ -68,11 +71,14 @@ pub fn build_project(project: &Project, release: bool) -> Result<()> {
         compiler: compiler.to_string(),
         includes: vec![project.root.join("include")],
         cflags: project.config.build.cflags.clone(),
+        dep_libs: Vec::new(),
+        dep_lib_dirs: Vec::new(),
     };
 
-    for (name, output) in &project.resolved_deps {
-        let prefix = project.dep_prefix(name);
+    for (_name, output) in &project.resolved_deps {
         opts.includes.extend(output.include_dirs.clone());
+        opts.dep_lib_dirs.extend(output.lib_dirs.clone());
+        opts.dep_libs.extend(output.libs.clone());
     }
 
     let mut object_files: Vec<PathBuf> = Vec::new();
@@ -102,8 +108,8 @@ pub fn build_project(project: &Project, release: bool) -> Result<()> {
         }
         cmd.arg(format!("-std={}", project.config.project.c_standard));
 
-        // Recording the actual command used for this specific file - 
-        // doing it before .output(), while cmd is still available for formatting, 
+        // Recording the actual command used for this specific file -
+        // doing it before .output(), while cmd is still available for formatting,
         // and after all arguments have been added.
         let command_str = format!("{:?}", cmd);
 
@@ -142,7 +148,10 @@ pub fn build_project(project: &Project, release: bool) -> Result<()> {
         object_files.push(obj_path);
     }
 
-    crate::compile_db::write(&compile_commands, &project.root.join("compile_commands.json"))?;
+    crate::compile_db::write(
+        &compile_commands,
+        &project.root.join("compile_commands.json"),
+    )?;
 
     let binary_path = build_dir.join("bin").join(
         project
@@ -157,7 +166,14 @@ pub fn build_project(project: &Project, release: bool) -> Result<()> {
     let mut link_cmd = std::process::Command::new(&opts.compiler);
     link_cmd.args(&object_files);
     link_cmd.arg("-o").arg(&binary_path);
+    link_cmd.args(
+        opts.dep_lib_dirs
+            .iter()
+            .map(|p| format!("-L{}", p.display())),
+    );
+    link_cmd.args(opts.dep_libs.iter().map(|l| format!("-l{}", l)));
     link_cmd.args(project.config.build.libs.iter().map(|l| format!("-l{}", l)));
+    link_cmd.args(&project.config.build.linker_flags);
 
     if profile.lto {
         link_cmd.arg("-flto");
@@ -186,7 +202,7 @@ pub fn build_project(project: &Project, release: bool) -> Result<()> {
 pub fn run_project(project: &Project, release: bool) -> Result<()> {
     build_project(project, release)?;
     let profile_dir = if release { "release" } else { "debug" };
-     let binary_path = project.build_dir.join(profile_dir).join("bin").join(
+    let binary_path = project.build_dir.join(profile_dir).join("bin").join(
         project
             .config
             .project
