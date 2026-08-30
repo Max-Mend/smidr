@@ -240,13 +240,34 @@ impl Project {
                     ));
                 }
                 SourceLocation::Path(_) => {
-                    // TODO: recursive build of path dependency
+                    eprintln!("warning: path dependencies are not yet built (coming in a future release), '{}' was skipped", name);
                 }
                 SourceLocation::Git { .. } => {
-                    // git not supported yet
+                    eprintln!("warning: git dependencies are not yet supported, '{}' was skipped", name);
                 }
             }
         }
+        Ok(())
+    }
+
+    pub fn add_dependency(&mut self, name: &str) -> Result<()> {
+        resolver::resolve_system_lib(name)?;
+        self.config.dependencies.insert(
+            name.to_string(),
+            crate::config::DependencySpec::Version("*".to_string()),
+        );
+
+        std::fs::write(self.root.join("Smidr.toml"), self.config.to_toml_string()?)?;
+
+        println!("Added dependency: {}", name);
+        Ok(())
+    }
+
+    pub fn remove_dependency(&mut self, name: &str) -> Result<()> {
+        self.config.dependencies.remove(name);
+        std::fs::write(self.root.join("Smidr.toml"), self.config.to_toml_string()?);
+        
+        println!("Removed dependency: {}", name);
         Ok(())
     }
 }

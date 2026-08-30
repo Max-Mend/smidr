@@ -63,5 +63,13 @@ fn run() -> error::Result<()> {
             let project = project::Project::load(&std::env::current_dir()?)?;
             builder::fmt_project(&project)
         }
+        Commands::Add { name } => {
+            let mut project = project::Project::load(&std::env::current_dir()?)?;
+            project.add_dependency(name)
+        }
+        Commands::Remove { name } => {
+            let mut project = project::Project::load(&std::env::current_dir()?)?;
+            project.remove_dependency(name)
+        }
     }
 }
