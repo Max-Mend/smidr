@@ -121,6 +121,8 @@ pub struct BuildSection {
     pub compiler: CompilerKind,
     pub cflags: Vec<String>,
     pub libs: Vec<String>,
+    #[serde(default)]
+    pub linker_flags: Vec<String>,
 }
 
 /// One entry under `[dependencies]` - describes where a dependency's
@@ -129,29 +131,25 @@ pub struct BuildSection {
 /// Exactly one of `git` or `path` must be set; see
 /// [`crate::resolver::resolve`] for how that's validated.
 #[derive(Deserialize, Serialize)]
-pub struct DependencySpec {
-    /// Git repository URL. Mutually exclusive with `path`. Not yet
-    /// implemented by [`crate::resolver`] - see the crate's roadmap.
-    pub git: Option<String>,
-    /// Path to a local copy of the dependency's source, relative to the
-    /// project root. Mutually exclusive with `git`.
-    pub path: Option<String>,
-    /// Git tag, branch, or commit to check out. Only meaningful with `git`.
-    pub tag: Option<String>,
-    /// Which [`crate::toolchain::DepBuilder`] to use for this dependency.
-    pub build_system: BuildSystemKind,
-    /// Shell commands to run when `build_system = "custom"`. See
-    /// [`crate::toolchain::CustomBuilder`].
-    #[serde(default)]
-    pub build_commands: Vec<String>,
-    /// Additional include directories to add, relative to the dependency's
-    /// install prefix. Used by [`crate::toolchain::CustomBuilder`].
-    #[serde(default)]
-    pub extra_includes: Vec<String>,
-    /// Library names to link against (`-l<name>`), for build systems that
-    /// can't report this automatically.
-    #[serde(default)]
-    pub libs: Vec<String>,
+#[serde(untagged)]
+pub enum DependencySpec {
+    /// A version string for a system library, e.g. `zlib = "1.3"`.
+    /// Resolved via a local search, then `pkg-config`.
+    Version(String),
+    /// A `git`, `path`, or build-system-configured dependency.
+    Detailed {
+        git: Option<String>,
+        path: Option<String>,
+        tag: Option<String>,
+        #[serde(default)]
+        build_system: BuildSystemKind,
+        #[serde(default)]
+        build_commands: Vec<String>,
+        #[serde(default)]
+        extra_includes: Vec<String>,
+        #[serde(default)]
+        libs: Vec<String>,
+    },
 }
 
 /// The `[profile]` section in Smidr.toml. (All fields optional)

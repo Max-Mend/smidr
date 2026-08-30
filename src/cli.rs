@@ -15,7 +15,7 @@ use clap::{Parser, Subcommand};
 
 /// Top-level CLI definition for the `smidr` binary.
 #[derive(Parser)]
-#[command(name = "Smidr", version = "0.4.0", long_about = None)]
+#[command(name = "Smidr", version = "0.5.0", long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
@@ -67,10 +67,14 @@ pub enum Commands {
     /// Format project source and header files with clang-format.
     #[command(alias = "fmt")]
     Format,
+    /// Add a dependency to the project.
+    #[command(alias = "a")]
+    Add { name: String },
+    /// Remove a dependency from the project.
+    #[command(alias = "rm")]
+    Remove { name: String },
 
     // TODO: Add:
-    // Add, // add dependency
-    // Remove, // remove dependency
     // Analyze, // analyze code
     // Lint, // lint code
     // Update, // update smidr

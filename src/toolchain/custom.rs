@@ -28,10 +28,17 @@ impl CustomBuilder {
     /// Build a [`CustomBuilder`] from a dependency's config, cloning out
     /// only the fields this builder needs.
     pub fn new(spec: &DependencySpec) -> Self {
-        Self {
-            commands: spec.build_commands.clone(),
-            libs: spec.libs.clone(),
-            extra_includes: spec.extra_includes.clone(),
+        match spec {
+            DependencySpec::Detailed { build_commands, libs, extra_includes, .. } => Self {
+                commands: build_commands.clone(),
+                libs: libs.clone(),
+                extra_includes: extra_includes.clone(),
+            },
+            DependencySpec::Version(_) => Self {
+                commands: Vec::new(),
+                libs: Vec::new(),
+                extra_includes: Vec::new(),
+            },
         }
     }
 }
