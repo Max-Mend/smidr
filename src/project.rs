@@ -221,7 +221,7 @@ impl Project {
     ///
     /// For now, only `Version` (system library) specs are handled -
     /// `path`/`git` wiring into an actual build comes later.
-    pub fn resolve_dependencies(&mut self) -> Result<()> {
+    pub fn resolve_dependencies(&mut self, is_release: bool) -> Result<()> {
         for (name, spec) in &self.config.dependencies {
             match resolver::resolve(name, spec, &self.root)? {
                 SourceLocation::System { .. } => {
@@ -239,8 +239,46 @@ impl Project {
                         },
                     ));
                 }
-                SourceLocation::Path(_) => {
-                    eprintln!("warning: path dependencies are not yet built (coming in a future release), '{}' was skipped", name);
+                SourceLocation::Path(dep_root) => {
+                    if dep_root.join("Smidr.toml").exists() {
+                        let dep_project = crate::project::Project::load(&dep_root)?;
+                        crate::builder::build_project(&dep_project, is_release)?;
+
+                        let dep_include = dep_root.join("include");
+                        
+                        let profile_dir = if is_release { "target/release" } else { "target/debug" };
+                        
+                        let lib_filename = format!("lib{}.a", name);
+                        
+                        let dep_original_lib_path = dep_root.join(profile_dir).join("bin").join(&lib_filename);
+                        
+                        let deps_cache_dir = std::path::Path::new(profile_dir).join("dept");
+                        std::fs::create_dir_all(&deps_cache_dir)?; 
+
+                        let dep_cached_lib_path = deps_cache_dir.join(&lib_filename);
+
+                        let needs_update = match (std::fs::metadata(&dep_cached_lib_path), std::fs::metadata(&dep_original_lib_path)) {
+                            (Ok(cached_meta), Ok(orig_meta)) => {
+                                cached_meta.modified().unwrap() < orig_meta.modified().unwrap()
+                            },
+                            _ => true, 
+                        };
+
+                        if needs_update {
+                            std::fs::copy(&dep_original_lib_path, &dep_cached_lib_path)?;
+                        }
+
+                        self.resolved_deps.push((
+                            name.clone(),
+                            BuildOutput {
+                                include_dirs: vec![dep_include],
+                                lib_dirs: vec![deps_cache_dir],
+                                libs: vec![name.clone()],
+                            },
+                        ));
+                    } else {
+                        eprintln!("warning: path dependencies without Smidr.toml are not yet supported, '{}' was skipped", name);
+                    }
                 }
                 SourceLocation::Git { .. } => {
                     eprintln!("warning: git dependencies are not yet supported, '{}' was skipped", name);
@@ -250,7 +288,7 @@ impl Project {
         Ok(())
     }
 
-    pub fn add_dependency(&mut self, name: &str) -> Result<()> {
+        pub fn add_dependency(&mut self, name: &str) -> Result<()> {
         resolver::resolve_system_lib(name)?;
         self.config.dependencies.insert(
             name.to_string(),
@@ -265,8 +303,8 @@ impl Project {
 
     pub fn remove_dependency(&mut self, name: &str) -> Result<()> {
         self.config.dependencies.remove(name);
-        std::fs::write(self.root.join("Smidr.toml"), self.config.to_toml_string()?);
-        
+        std::fs::write(self.root.join("Smidr.toml"), self.config.to_toml_string()?)?;
+
         println!("Removed dependency: {}", name);
         Ok(())
     }

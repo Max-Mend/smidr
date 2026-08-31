@@ -42,12 +42,12 @@ fn run() -> error::Result<()> {
         }
         Commands::Build { release } => {
             let mut project = project::Project::load(&std::env::current_dir()?)?;
-            project.resolve_dependencies()?;
+            project.resolve_dependencies(*release)?;
             builder::build_project(&project, *release)
         }
         Commands::Run { release } => {
             let mut project = project::Project::load(&std::env::current_dir()?)?;
-            project.resolve_dependencies()?;
+            project.resolve_dependencies(*release)?;
             builder::run_project(&project, *release)
         }
         Commands::Clean => {
@@ -56,7 +56,7 @@ fn run() -> error::Result<()> {
         }
         Commands::Rebuild { release } => {
             let mut project = project::Project::load(&std::env::current_dir()?)?;
-            project.resolve_dependencies()?;
+            project.resolve_dependencies(*release)?;
             builder::rebuild_project(&project, *release)
         }
         Commands::Format => {

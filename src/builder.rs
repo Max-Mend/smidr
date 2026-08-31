@@ -152,40 +152,68 @@ pub fn build_project(project: &Project, release: bool) -> Result<()> {
         &project.root.join("compile_commands.json"),
     )?;
 
-    let binary_path = build_dir.join("bin").join(
-        project
-            .config
-            .project
-            .output_name
-            .as_ref()
-            .unwrap_or(&project.config.project.name),
-    );
+    let output_name = project.config.project.output_name();
+
     std::fs::create_dir_all(build_dir.join("bin"))?;
 
-    let mut link_cmd = std::process::Command::new(&opts.compiler);
-    link_cmd.args(&object_files);
-    link_cmd.arg("-o").arg(&binary_path);
-    link_cmd.args(
-        opts.dep_lib_dirs
-            .iter()
-            .map(|p| format!("-L{}", p.display())),
-    );
-    link_cmd.args(opts.dep_libs.iter().map(|l| format!("-l{}", l)));
-    link_cmd.args(project.config.build.libs.iter().map(|l| format!("-l{}", l)));
-    link_cmd.args(&project.config.build.linker_flags);
+    // Linking based on project type
+    match project.config.project.project_type {
+        // Binary
+        crate::config::ProjectType::Binary => {
+            let binary_path = build_dir.join("bin").join(output_name);
 
-    if profile.lto {
-        link_cmd.arg("-flto");
-    }
-    if profile.strip {
-        link_cmd.arg("-s");
-    }
+            let mut link_cmd = std::process::Command::new(&opts.compiler);
+            link_cmd.args(&object_files);
+            link_cmd.arg("-o").arg(&binary_path);
+            link_cmd.args(opts.dep_lib_dirs.iter().map(|p| format!("-L{}", p.display())));
+            link_cmd.args(opts.dep_libs.iter().map(|l| format!("-l{}", l)));
+            link_cmd.args(project.config.build.libs.iter().map(|l| format!("-l{}", l)));
+            link_cmd.args(&project.config.build.linker_flags);
+            if profile.lto { link_cmd.arg("-flto"); }
+            if profile.strip { link_cmd.arg("-s"); }
 
-    let output = link_cmd.output()?;
-    if !output.status.success() {
-        return Err(crate::error::BuildError::Link(
-            String::from_utf8_lossy(&output.stderr).to_string(),
-        ));
+            let output = link_cmd.output()?;
+            if !output.status.success() {
+                return Err(crate::error::BuildError::Link(
+                    String::from_utf8_lossy(&output.stderr).to_string(),
+                ));
+            }
+        }
+
+        // Static library
+        crate::config::ProjectType::StaticLibrary => {
+            let lib_path = build_dir.join("bin").join(format!("lib{}.a", output_name));
+
+            let mut ar_cmd = std::process::Command::new("ar");
+            ar_cmd.arg("rcs").arg(&lib_path).args(&object_files);
+
+            let output = ar_cmd.output()?;
+            if !output.status.success() {
+                return Err(crate::error::BuildError::Link(
+                    String::from_utf8_lossy(&output.stderr).to_string(),
+                ));
+            }
+        }
+
+        // Shared library
+        crate::config::ProjectType::SharedLibrary => {
+            let lib_path = build_dir.join("bin").join(format!("lib{}.so", output_name));
+
+            let mut link_cmd = std::process::Command::new(&opts.compiler);
+            link_cmd.arg("-shared").args(&object_files);
+            link_cmd.arg("-o").arg(&lib_path);
+            link_cmd.args(opts.dep_lib_dirs.iter().map(|p| format!("-L{}", p.display())));
+            link_cmd.args(opts.dep_libs.iter().map(|l| format!("-l{}", l)));
+            link_cmd.args(project.config.build.libs.iter().map(|l| format!("-l{}", l)));
+            link_cmd.args(&project.config.build.linker_flags);
+
+            let output = link_cmd.output()?;
+            if !output.status.success() {
+                return Err(crate::error::BuildError::Link(
+                    String::from_utf8_lossy(&output.stderr).to_string(),
+                ));
+            }
+        }
     }
 
     Ok(())
