@@ -277,7 +277,13 @@ impl Project {
                             },
                         ));
                     } else {
-                        eprintln!("warning: path dependencies without Smidr.toml are not yet supported, '{}' was skipped", name);
+                        let build_system = match spec {
+                            crate::config::DependencySpec::Detailed { build_system, .. } => build_system,
+                            crate::config::DependencySpec::Version(_) => &crate::config::BuildSystemKind::Auto,
+                        };
+                        let builder = crate::toolchain::resolve_builder(name, build_system, &dep_root, spec)?;
+                        let output = builder.build(&dep_root, &self.dep_prefix(name))?;
+                        self.resolved_deps.push((name.clone(), output));
                     }
                 }
                 SourceLocation::Git { .. } => {
