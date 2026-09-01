@@ -222,12 +222,13 @@ impl Project {
     /// For now, only `Version` (system library) specs are handled -
     /// `path`/`git` wiring into an actual build comes later.
     pub fn resolve_dependencies(&mut self, is_release: bool) -> Result<()> {
-        for (name, spec) in &self.config.dependencies {
+        let dependencies = self.config.dependencies.clone();
+        for (name, spec) in &dependencies {
             match resolver::resolve(name, spec, &self.root)? {
                 SourceLocation::System { .. } => {
                     let lib_info = resolver::resolve_system_lib(name)?;
                     self.resolved_deps.push((
-                        name.clone(),
+                        name.to_string(),
                         BuildOutput {
                             include_dirs: lib_info.cflags.iter()
                                 .filter_map(|f| f.strip_prefix("-I").map(PathBuf::from))
@@ -240,61 +241,75 @@ impl Project {
                     ));
                 }
                 SourceLocation::Path(dep_root) => {
-                    if dep_root.join("Smidr.toml").exists() {
-                        let dep_project = crate::project::Project::load(&dep_root)?;
-                        crate::builder::build_project(&dep_project, is_release)?;
-
-                        let dep_include = dep_root.join("include");
-                        
-                        let profile_dir = if is_release { "target/release" } else { "target/debug" };
-                        
-                        let lib_filename = format!("lib{}.a", name);
-                        
-                        let dep_original_lib_path = dep_root.join(profile_dir).join("bin").join(&lib_filename);
-                        
-                        let deps_cache_dir = std::path::Path::new(profile_dir).join("dept");
-                        std::fs::create_dir_all(&deps_cache_dir)?; 
-
-                        let dep_cached_lib_path = deps_cache_dir.join(&lib_filename);
-
-                        let needs_update = match (std::fs::metadata(&dep_cached_lib_path), std::fs::metadata(&dep_original_lib_path)) {
-                            (Ok(cached_meta), Ok(orig_meta)) => {
-                                cached_meta.modified().unwrap() < orig_meta.modified().unwrap()
-                            },
-                            _ => true, 
-                        };
-
-                        if needs_update {
-                            std::fs::copy(&dep_original_lib_path, &dep_cached_lib_path)?;
-                        }
-
-                        self.resolved_deps.push((
-                            name.clone(),
-                            BuildOutput {
-                                include_dirs: vec![dep_include],
-                                lib_dirs: vec![deps_cache_dir],
-                                libs: vec![name.clone()],
-                            },
-                        ));
-                    } else {
-                        let build_system = match spec {
-                            crate::config::DependencySpec::Detailed { build_system, .. } => build_system,
-                            crate::config::DependencySpec::Version(_) => &crate::config::BuildSystemKind::Auto,
-                        };
-                        let builder = crate::toolchain::resolve_builder(name, build_system, &dep_root, spec)?;
-                        let output = builder.build(&dep_root, &self.dep_prefix(name))?;
-                        self.resolved_deps.push((name.clone(), output));
-                    }
+                    self.build_and_register_dep(name, spec, &dep_root, is_release)?;
                 }
-                SourceLocation::Git { .. } => {
-                    eprintln!("warning: git dependencies are not yet supported, '{}' was skipped", name);
+                SourceLocation::Git { url, tag } => {
+                    let dest = self.build_dir.join("deps-src").join(name);
+                    let dep_root = resolver::resolve_git(name, &url, &tag, &dest)?;
+                    self.build_and_register_dep(name, spec, &dep_root, is_release)?;
                 }
             }
         }
         Ok(())
     }
 
-        pub fn add_dependency(&mut self, name: &str) -> Result<()> {
+    /// Build a dependency found at `dep_root` (a `path` on disk, or a
+    /// freshly-cloned `git` checkout) and register the result in
+    /// `resolved_deps`. Shared between `Path` and `Git` sources, which
+    /// differ only in how `dep_root` was found.
+    fn build_and_register_dep(
+        &mut self,
+        name: &str,
+        spec: &crate::config::DependencySpec,
+        dep_root: &Path,
+        is_release: bool,
+    ) -> Result<()> {
+        if dep_root.join("Smidr.toml").exists() {
+            let dep_project = crate::project::Project::load(dep_root)?;
+            crate::builder::build_project(&dep_project, is_release)?;
+
+            let dep_include = dep_root.join("include");
+            let profile_dir = if is_release { "target/release" } else { "target/debug" };
+            let lib_filename = format!("lib{}.a", name);
+            let dep_original_lib_path = dep_root.join(profile_dir).join("bin").join(&lib_filename);
+
+            let deps_cache_dir = self.build_dir.join(profile_dir).join("deps");
+            std::fs::create_dir_all(&deps_cache_dir)?;
+            let dep_cached_lib_path = deps_cache_dir.join(&lib_filename);
+
+            let needs_update = match (
+                std::fs::metadata(&dep_cached_lib_path),
+                std::fs::metadata(&dep_original_lib_path),
+            ) {
+                (Ok(cached), Ok(orig)) => cached.modified().unwrap() < orig.modified().unwrap(),
+                _ => true,
+            };
+
+            if needs_update {
+                std::fs::copy(&dep_original_lib_path, &dep_cached_lib_path)?;
+            }
+
+            self.resolved_deps.push((
+                name.to_string(),
+                BuildOutput {
+                    include_dirs: vec![dep_include],
+                    lib_dirs: vec![deps_cache_dir],
+                    libs: vec![name.to_string()],
+                },
+            ));
+        } else {
+            let build_system = match spec {
+                crate::config::DependencySpec::Detailed { build_system, .. } => build_system,
+                crate::config::DependencySpec::Version(_) => &crate::config::BuildSystemKind::Auto,
+            };
+            let builder = crate::toolchain::resolve_builder(name, build_system, dep_root, spec)?;
+            let output = builder.build(dep_root, &self.dep_prefix(name))?;
+            self.resolved_deps.push((name.to_string(), output));
+        }
+        Ok(())
+    }
+
+    pub fn add_dependency(&mut self, name: &str) -> Result<()> {
         resolver::resolve_system_lib(name)?;
         self.config.dependencies.insert(
             name.to_string(),

@@ -130,7 +130,7 @@ pub struct BuildSection {
 ///
 /// Exactly one of `git` or `path` must be set; see
 /// [`crate::resolver::resolve`] for how that's validated.
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 #[serde(untagged)]
 pub enum DependencySpec {
     /// A version string for a system library, e.g. `zlib = "1.3"`.
@@ -215,7 +215,8 @@ pub struct BinTarget {
 /// dependency's source directory and picks the best match - see
 /// [`crate::toolchain::resolve_builder`] for the detection order and
 /// priority when more than one candidate is found.
-#[derive(Debug, Deserialize, Serialize, Default, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Serialize, Default, PartialEq, Eq, Clone)]
+#[serde(rename_all = "lowercase")]
 pub enum BuildSystemKind {
     #[default]
     Auto,

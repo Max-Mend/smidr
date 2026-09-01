@@ -17,7 +17,7 @@ use std::process::Command;
 /// Where a dependency's source was found.
 pub enum SourceLocation {
     Path(PathBuf),
-    Git { url: String, tag: String },
+    Git { url: String, tag: Option<String> },
     /// A system library, resolved via local search or `pkg-config`.
     /// Not yet consumed anywhere - see [`resolve`].
     System { version: String },
@@ -94,7 +94,7 @@ pub fn resolve(name: &str, spec: &DependencySpec, project_root: &Path) -> Result
             Ok(SourceLocation::System { version: version.clone() })
         }
 
-        DependencySpec::Detailed { git, path, .. } => {
+        DependencySpec::Detailed { git, path, tag, .. } => {
             match (git, path) {
                 (None, None) => Err(BuildError::Dependency {
                     name: name.to_string(),
@@ -117,11 +117,72 @@ pub fn resolve(name: &str, spec: &DependencySpec, project_root: &Path) -> Result
                     Ok(SourceLocation::Path(full))
                 }
 
-                (Some(_git_url), None) => Err(BuildError::Dependency {
-                    name: name.to_string(),
-                    reason: "git repositories are not supported yet".to_string(),
+                (Some(git_url), None) => Ok(SourceLocation::Git {
+                    url: git_url.clone(),
+                    tag: tag.clone(),
                 }),
             }
         }
     }
+}
+
+fn list_tags(url: &str) -> Result<Vec<String>> {
+    let output = Command::new("git")
+        .args(["ls-remote", "--tags", "--refs", url])
+        .output()
+        .map_err(BuildError::Io)?;
+
+    Ok(String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter_map(|line| line.split('/').last().map(String::from))
+        .collect())
+}
+
+fn latest_stable_tag(tags: Vec<String>) -> Option<String> {
+    tags.into_iter()
+        .filter_map(|tag| {
+            let clean = tag.trim_start_matches('v');
+            semver::Version::parse(clean).ok().map(|v| (tag, v))
+        })
+        .filter(|(_, v)| v.pre.is_empty())
+        .max_by(|(_, a), (_, b)| a.cmp(b))
+        .map(|(tag, _)| tag)
+}
+
+fn clone_at_tag(url: &str, tag: &str, dest: &Path) -> Result<()> {
+    let status = Command::new("git")
+        .args(["clone", "--branch", tag, "--depth", "1", url])
+        .arg(dest)
+        .status()
+        .map_err(BuildError::Io)?;
+
+    if !status.success() {
+        return Err(BuildError::Dependency {
+            name: dest.display().to_string(),
+            reason: format!("failed to clone {} at tag {}", url, tag),
+        });
+    }
+    Ok(())
+}
+
+/// Resolve a git dependency into a local path, cloning it (at the pinned
+/// tag, or the latest stable release if none is given) if not already cached.
+pub fn resolve_git(name: &str, url: &str, tag: &Option<String>, dest: &Path) -> Result<PathBuf> {
+    let resolved_tag = match tag {
+        Some(t) => t.clone(),
+        None => {
+            let tags = list_tags(url)?;
+            latest_stable_tag(tags).ok_or_else(|| BuildError::Dependency {
+                name: name.to_string(),
+                reason: "no stable release tags found; specify a tag explicitly".to_string(),
+            })?
+        }
+    };
+
+    if !dest.exists() {
+        println!("Package '{}': cloning at tag '{}'", name, resolved_tag);
+        clone_at_tag(url, &resolved_tag, dest)?;
+    }
+
+    Ok(dest.to_path_buf())
 }

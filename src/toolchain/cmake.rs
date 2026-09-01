@@ -30,6 +30,7 @@ impl DepBuilder for CMakeBuilder {
             .args(["-S", ".", "-B", "build"])
             .arg(format!("-DCMAKE_INSTALL_PREFIX={}", prefix.display()))
             .arg("-DCMAKE_BUILD_TYPE=Release")
+            .arg("-DCMAKE_POLICY_VERSION_MINIMUM=3.5")
             .current_dir(src_dir))?;
 
         // 2. Build.
