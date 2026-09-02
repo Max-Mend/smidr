@@ -5,9 +5,10 @@
 //! Resolves where a dependency's source actually lives on disk.
 //!
 //! This module only answers "where is the source?" - it has no opinion
-//! on how that source gets built (that's [`crate::toolchain`]). Currently
-//! only local `path =` dependencies are implemented; `git =` is parsed
-//! and validated but not yet fetched.
+//! on how that source gets built (that's [`crate::toolchain`]). 
+//! `path` dependencies are resolved directly; `git` dependencies are
+//! cloned (at a pinned tag, or the latest stable release if none is
+//! given) before being resolved the same way as `path`.
 
 use crate::config::DependencySpec;
 use crate::error::{BuildError, Result};
@@ -131,6 +132,16 @@ fn list_tags(url: &str) -> Result<Vec<String>> {
         .args(["ls-remote", "--tags", "--refs", url])
         .output()
         .map_err(BuildError::Io)?;
+
+    if !output.status.success() {
+        return Err(BuildError::Dependency {
+            name: url.to_string(),
+            reason: format!(
+                "failed to query tags: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ),
+        });
+    }
 
     Ok(String::from_utf8_lossy(&output.stdout)
         .lines()
