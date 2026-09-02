@@ -1,6 +1,6 @@
 [package]
 name = "smidr"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2024"
 authors = ["Max-Mend"]
 description = "Smidr is a cargo-inspired build tool for C projects, meant to bridge dependencies across different build systems into a single build."

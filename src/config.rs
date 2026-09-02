@@ -18,8 +18,11 @@ use std::path::Path;
 /// The full, typed contents of a `Smidr.toml` file.
 #[derive(Deserialize, Serialize)]
 pub struct ManifestConfig {
-    pub project: ProjectSection,
-    pub build: BuildSection,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project: Option<ProjectSection>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build: Option<BuildSection>,
+    #[serde(default)]
     pub dependencies: BTreeMap<String, DependencySpec>,
     /// Optional `[workspace]` section: lets this same `Smidr.toml` also
     /// act as the root of a multi-project workspace, listing paths to

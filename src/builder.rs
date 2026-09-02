@@ -51,6 +51,19 @@ pub struct CompileOptions {
 /// file fails to compile, or [`crate::error::BuildError::Link`] if the
 /// final link step fails.
 pub fn build_project(project: &Project, release: bool) -> Result<()> {
+    let project_section = project.config.project.as_ref().ok_or_else(|| {
+        crate::error::BuildError::Dependency {
+            name: project.root.display().to_string(),
+            reason: "cannot build: Smidr.toml has no [project] section (this is a workspace root)".to_string(),
+        }
+    })?;
+    let build_section = project.config.build.as_ref().ok_or_else(|| {
+        crate::error::BuildError::Dependency {
+            name: project.root.display().to_string(),
+            reason: "cannot build: Smidr.toml has no [build] section".to_string(),
+        }
+    })?;
+
     let sources = project.source_files()?;
     project.header_files()?;
 
@@ -58,7 +71,7 @@ pub fn build_project(project: &Project, release: bool) -> Result<()> {
     let build_dir = project.build_dir.join(profile_dir);
     std::fs::create_dir_all(&build_dir)?;
 
-    let compiler = compiler_binary(&project.config.build.compiler)?;
+    let compiler = compiler_binary(&build_section.compiler)?;
     println!("Using compiler: {}", compiler);
 
     let profile = if release {
@@ -70,7 +83,7 @@ pub fn build_project(project: &Project, release: bool) -> Result<()> {
     let mut opts = CompileOptions {
         compiler: compiler.to_string(),
         includes: vec![project.root.join("include")],
-        cflags: project.config.build.cflags.clone(),
+        cflags: build_section.cflags.clone(),
         dep_libs: Vec::new(),
         dep_lib_dirs: Vec::new(),
     };
@@ -106,7 +119,7 @@ pub fn build_project(project: &Project, release: bool) -> Result<()> {
         if profile.debug_symbols {
             cmd.arg("-g");
         }
-        cmd.arg(format!("-std={}", project.config.project.c_standard));
+        cmd.arg(format!("-std={}", project_section.c_standard));
 
         // Recording the actual command used for this specific file -
         // doing it before .output(), while cmd is still available for formatting,
@@ -152,12 +165,12 @@ pub fn build_project(project: &Project, release: bool) -> Result<()> {
         &project.root.join("compile_commands.json"),
     )?;
 
-    let output_name = project.config.project.output_name();
+    let output_name = project_section.output_name();
 
     std::fs::create_dir_all(build_dir.join("bin"))?;
 
     // Linking based on project type
-    match project.config.project.project_type {
+    match project_section.project_type {
         // Binary
         crate::config::ProjectType::Binary => {
             let binary_path = build_dir.join("bin").join(output_name);
@@ -167,8 +180,8 @@ pub fn build_project(project: &Project, release: bool) -> Result<()> {
             link_cmd.arg("-o").arg(&binary_path);
             link_cmd.args(opts.dep_lib_dirs.iter().map(|p| format!("-L{}", p.display())));
             link_cmd.args(opts.dep_libs.iter().map(|l| format!("-l{}", l)));
-            link_cmd.args(project.config.build.libs.iter().map(|l| format!("-l{}", l)));
-            link_cmd.args(&project.config.build.linker_flags);
+            link_cmd.args(build_section.libs.iter().map(|l| format!("-l{}", l)));
+            link_cmd.args(&build_section.linker_flags);
             if profile.lto { link_cmd.arg("-flto"); }
             if profile.strip { link_cmd.arg("-s"); }
 
@@ -204,8 +217,8 @@ pub fn build_project(project: &Project, release: bool) -> Result<()> {
             link_cmd.arg("-o").arg(&lib_path);
             link_cmd.args(opts.dep_lib_dirs.iter().map(|p| format!("-L{}", p.display())));
             link_cmd.args(opts.dep_libs.iter().map(|l| format!("-l{}", l)));
-            link_cmd.args(project.config.build.libs.iter().map(|l| format!("-l{}", l)));
-            link_cmd.args(&project.config.build.linker_flags);
+            link_cmd.args(build_section.libs.iter().map(|l| format!("-l{}", l)));
+            link_cmd.args(&build_section.linker_flags);
 
             let output = link_cmd.output()?;
             if !output.status.success() {
@@ -228,14 +241,18 @@ pub fn build_project(project: &Project, release: bool) -> Result<()> {
 /// exits with a non-zero status.
 pub fn run_project(project: &Project, release: bool) -> Result<()> {
     build_project(project, release)?;
+    let project_section = project.config.project.as_ref().ok_or_else(|| {
+        crate::error::BuildError::Dependency {
+            name: project.root.display().to_string(),
+            reason: "cannot run: Smidr.toml has no [project] section".to_string(),
+        }
+    })?;
     let profile_dir = if release { "release" } else { "debug" };
     let binary_path = project.build_dir.join(profile_dir).join("bin").join(
-        project
-            .config
-            .project
+        project_section
             .output_name
             .as_ref()
-            .unwrap_or(&project.config.project.name),
+            .unwrap_or(&project_section.name),
     );
 
     println!("Running: {}", binary_path.display());

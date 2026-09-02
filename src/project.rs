@@ -118,7 +118,7 @@ impl Project {
         }        
 
         let config = ManifestConfig {
-            project: ProjectSection {
+            project: Some(ProjectSection {
                 name: name.to_string(),
                 version: "0.1.0".to_string(),
                 authors: Vec::new(),
@@ -130,14 +130,14 @@ impl Project {
                 c_standard: c_standard.unwrap_or_default(),
                 cpp_standard: None,
                 output_name: None,
-            },
+            }),
             
-            build: BuildSection {
+            build: Some(BuildSection {
                 compiler: Default::default(),
                 cflags: Vec::new(),
                 libs: Vec::new(),
                 linker_flags: Vec::new(),
-            },
+            }),
             dependencies: BTreeMap::new(),
             workspace: None,
             profile: Default::default(),
@@ -187,16 +187,20 @@ impl Project {
     /// Returns [`BuildError::NoSourceFiles`] if `src/` contains no matching source files.
     pub fn source_files(&self) -> Result<Vec<PathBuf>> {
         let sources = self.collect_files(&[&self.src_dir], &["c", "cpp", "cc", "cxx"])?;
-        if sources.is_empty() {
-            return Err(BuildError::NoSourceFiles);
+        if let Some(project_section) = &self.config.project {
+            if sources.is_empty() && project_section.project_type == ProjectType::Binary {
+                return Err(BuildError::NoSourceFiles);
+            }
         }
         Ok(sources)
     }
 
     pub fn header_files(&self) -> Result<Vec<PathBuf>> {
         let headers = self.collect_files(&[&self.root.join("include")], &["h", "hpp", "hh"])?;
-        if headers.is_empty() && self.config.project.project_type == ProjectType::StaticLibrary {
-            return Err(BuildError::NoHeaderFiles);
+        if let Some(project_section) = &self.config.project {
+            if headers.is_empty() && project_section.project_type == ProjectType::StaticLibrary {
+                return Err(BuildError::NoHeaderFiles);
+            }
         }
         Ok(headers)
     }
