@@ -40,16 +40,8 @@ fn run() -> error::Result<()> {
             };
             project::Project::init(name, project_type, std.clone())
         }
-        Commands::Build { release } => {
-            let mut project = project::Project::load(&std::env::current_dir()?)?;
-            project.resolve_dependencies(*release)?;
-            builder::build_project(&project, *release)
-        }
-        Commands::Run { release } => {
-            let mut project = project::Project::load(&std::env::current_dir()?)?;
-            project.resolve_dependencies(*release)?;
-            builder::run_project(&project, *release)
-        }
+        Commands::Build { release } => build_current(*release),
+        Commands::Run { release } => run_current(*release),
         Commands::Clean => {
             let project = project::Project::load(&std::env::current_dir()?)?;
             builder::clean_project(&project)
@@ -72,4 +64,60 @@ fn run() -> error::Result<()> {
             project.remove_dependency(name)
         }
     }
+}
+
+fn build_current(release: bool) -> error::Result<()> {
+    let cwd = std::env::current_dir()?;
+    let raw_config = config::ManifestConfig::load(&cwd)?;
+
+    // Якщо є workspace-члени - збудуй їх спочатку
+    if let Some(workspace) = &raw_config.workspace {
+        build_workspace(&cwd, workspace, release)?;
+    }
+
+    // Якщо в корені є [project] - збудуй і сам корінь
+    if raw_config.project.is_some() {
+        let mut project = project::Project::load(&cwd)?;
+        project.resolve_dependencies(release)?;
+        builder::build_project(&project, release)?;
+    }
+
+    Ok(())
+}
+
+fn run_current(release: bool) -> error::Result<()> {
+    let cwd = std::env::current_dir()?;
+    let raw_config = config::ManifestConfig::load(&cwd)?;
+
+    if raw_config.project.is_none() {
+        return Err(error::BuildError::Dependency {
+            name: cwd.display().to_string(),
+            reason: "cannot run: this Smidr.toml has no [project] section (workspace root only). \
+                     Run from inside a specific member directory instead.".to_string(),
+        });
+    }
+
+    if let Some(workspace) = &raw_config.workspace {
+        build_workspace(&cwd, workspace, release)?;
+    }
+
+    let mut project = project::Project::load(&cwd)?;
+    project.resolve_dependencies(release)?;
+    builder::run_project(&project, release)
+}
+
+fn build_workspace(
+    root: &std::path::Path,
+    workspace: &config::WorkspacesConfig,
+    release: bool,
+) -> error::Result<()> {
+    for member in &workspace.members {
+        let member_path = root.join(member);
+        println!("Building workspace member: {}", member);
+
+        let mut member_project = project::Project::load(&member_path)?;
+        member_project.resolve_dependencies(release)?;
+        builder::build_project(&member_project, release)?;
+    }
+    Ok(())
 }
