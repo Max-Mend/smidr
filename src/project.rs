@@ -13,7 +13,7 @@
 //! linked binary, dependency installs) live in [`crate::builder`] and
 //! [`crate::toolchain`], not here.
 
-use crate::config::{BuildSection, CStandard, Language, ManifestConfig, ProjectSection, ProjectType};
+use crate::config::{BuildSection, CStandard, Language, ManifestConfig, PathsConfig, ProjectSection, ProjectType};
 use crate::error::{BuildError, Result};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -65,9 +65,12 @@ impl Project {
     pub fn load(project_dir: &Path) -> Result<Self> {
         let config = ManifestConfig::load(project_dir)?;
 
+        let src_dir_name = config.paths.src_dir.as_deref().unwrap_or("src");
+        let src_dir = project_dir.join(src_dir_name);
+
         Ok(Self {
             root: project_dir.to_path_buf(),
-            src_dir: project_dir.join("src"),
+            src_dir,
             build_dir: project_dir.join("target"),
             install_dir: project_dir.join("target/deps"),
             config,
@@ -142,6 +145,7 @@ impl Project {
             workspace: None,
             profile: Default::default(),
             extra_bins: Vec::new(),
+            paths: PathsConfig::default(),
         };
         std::fs::write(root.join("Smidr.toml"), config.to_toml_string()?)?;
         std::fs::write(root.join(".gitignore"), GITIGNORE_TEMPLATE)?;
@@ -186,17 +190,25 @@ impl Project {
     /// # Errors
     /// Returns [`BuildError::NoSourceFiles`] if `src/` contains no matching source files.
     pub fn source_files(&self) -> Result<Vec<PathBuf>> {
-        let sources = self.collect_files(&[&self.src_dir], &["c", "cpp", "cc", "cxx"])?;
-        if let Some(project_section) = &self.config.project {
-            if sources.is_empty() && project_section.project_type == ProjectType::Binary {
-                return Err(BuildError::NoSourceFiles);
-            }
+        let custom_dirs: Vec<PathBuf> = self.config.paths.custom.values()
+            .map(|p| self.root.join(p))
+            .collect();
+
+        let mut dirs: Vec<&Path> = vec![self.src_dir.as_path()];
+        dirs.extend(custom_dirs.iter().map(|p| p.as_path()));
+
+        let sources = self.collect_files(&dirs, &["c", "cpp", "cc", "cxx"])?;
+        if sources.is_empty() {
+            return Err(BuildError::NoSourceFiles);
         }
         Ok(sources)
     }
 
     pub fn header_files(&self) -> Result<Vec<PathBuf>> {
-        let headers = self.collect_files(&[&self.root.join("include")], &["h", "hpp", "hh"])?;
+        let include_dir_name = self.config.paths.include.as_deref().unwrap_or("include");
+        let include_dir = self.root.join(include_dir_name);
+
+        let headers = self.collect_files(&[&include_dir], &["h", "hpp", "hh"])?;
         if let Some(project_section) = &self.config.project {
             if headers.is_empty() && project_section.project_type == ProjectType::StaticLibrary {
                 return Err(BuildError::NoHeaderFiles);

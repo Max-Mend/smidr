@@ -35,6 +35,8 @@ pub struct ManifestConfig {
     pub profile: ProfilesSection,
     #[serde(default, rename = "bin", skip_serializing_if = "Vec::is_empty")]
     pub extra_bins: Vec<BinTarget>,
+    #[serde(default, skip_serializing_if = "PathsConfig::is_empty")]
+    pub paths: PathsConfig,
 }
 
 /// The `[project]` section: identifying metadata for the project.
@@ -241,6 +243,18 @@ pub enum CompilerKind {
     Clang,
 }
 
+#[derive(Debug, Deserialize, Serialize, Default)]
+pub struct PathsConfig {
+    #[serde(default)]
+    pub src_dir: Option<String>,
+    #[serde(default)]
+    pub include: Option<String>,
+    /// Additional named source directories, compiled alongside `src_dir`
+    /// (e.g. `core = "core"`, `platform = "platform"`).
+    #[serde(flatten)]
+    pub custom: BTreeMap<String, String>,
+}
+
 impl ManifestConfig {
     /// Read and parse `Smidr.toml` from `project_dir`.
     ///
@@ -318,6 +332,13 @@ impl ProfilesSection {
     /// This is used by `toml::to_string_pretty` to decide whether to serialize the `profile` field
     pub fn is_empty(&self) -> bool {
         self.debug.is_none() && self.release.is_none()
+    }
+}
+
+impl PathsConfig {
+    /// Returns `true` if no path settings are specified (all fields are `None` or empty).
+    pub fn is_empty(&self) -> bool {
+        self.src_dir.is_none() && self.include.is_none() && self.custom.is_empty()
     }
 }
 

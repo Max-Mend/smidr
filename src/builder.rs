@@ -82,7 +82,13 @@ pub fn build_project(project: &Project, release: bool) -> Result<()> {
 
     let mut opts = CompileOptions {
         compiler: compiler.to_string(),
-        includes: vec![project.root.join("include")],
+        includes: {
+            let mut incs = vec![project.root.join(
+                project.config.paths.include.as_deref().unwrap_or("include")
+            )];
+            incs.extend(project.config.paths.custom.values().map(|p| project.root.join(p)));
+            incs
+        },
         cflags: build_section.cflags.clone(),
         dep_libs: Vec::new(),
         dep_lib_dirs: Vec::new(),
