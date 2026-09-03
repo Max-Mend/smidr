@@ -13,7 +13,7 @@
 //! linked binary, dependency installs) live in [`crate::builder`] and
 //! [`crate::toolchain`], not here.
 
-use crate::config::{BuildSection, CStandard, Language, ManifestConfig, PathsConfig, ProjectSection, ProjectType};
+use crate::config::{BuildSection, CStandard, Language, LanguageStandard, ManifestConfig, PathsConfig, ProjectSection, ProjectType};
 use crate::error::{BuildError, Result};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -91,7 +91,7 @@ impl Project {
     pub fn init(
         name: &str,
         project_type: ProjectType,
-        c_standard: Option<CStandard>,
+        language_standard: Option<LanguageStandard>,
     ) -> Result<()> {
         if name.is_empty()
             || name.contains('/')
@@ -110,15 +110,34 @@ impl Project {
         std::fs::create_dir_all(root.join("src"))?;
         std::fs::create_dir_all(root.join("include"))?;
 
+        let (language, c_standard, cpp_standard, ext, header_ext) = match language_standard {
+            Some(std) => (
+                std.language(),
+                std.c_standard(),
+                std.cpp_standard(),
+                if std.language() == Language::C { "c" } else { "cpp" },
+                if std.language() == Language::C { "h" } else { "hpp" },
+            ),
+            None => (Language::C, CStandard::default(), None, "c", "h"),
+        };
+
         match project_type {
             ProjectType::Binary => {
-                std::fs::write(root.join("src/main.c"), MAIN_C_TEMPLATE)?;
+                let template = match language {
+                    Language::C => MAIN_C_TEMPLATE,
+                    Language::Cpp => MAIN_CPP_TEMPLATE,
+                };
+                std::fs::write(root.join(format!("src/main.{ext}")), template)?;
             }
             ProjectType::StaticLibrary | ProjectType::SharedLibrary => {
-                std::fs::write(root.join("src/lib.c"), LIB_C_TEMPLATE)?;
-                std::fs::write(root.join("include/lib.h"), LIB_H_TEMPLATE)?;
+                let (lib_template, header_template) = match language {
+                    Language::C => (LIB_C_TEMPLATE, LIB_H_TEMPLATE),
+                    Language::Cpp => (LIB_CPP_TEMPLATE, LIB_HPP_TEMPLATE),
+                };
+                std::fs::write(root.join(format!("src/lib.{ext}")), lib_template)?;
+                std::fs::write(root.join(format!("include/lib.{header_ext}")), header_template)?;
             }
-        }        
+        }
 
         let config = ManifestConfig {
             project: Some(ProjectSection {
@@ -129,9 +148,9 @@ impl Project {
                 description: None,
                 license: None,
                 project_type,
-                language: Language::C,
-                c_standard: c_standard.unwrap_or_default(),
-                cpp_standard: None,
+                language,
+                c_standard,
+                cpp_standard,
                 output_name: None,
             }),
             

@@ -75,12 +75,19 @@ pub enum ProjectType {
     SharedLibrary,
 }
 
-#[derive(Debug, Clone, clap::ValueEnum, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, clap::ValueEnum, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Language {
     #[default]
     C,
     Cpp,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum LanguageStandard {
+    C(CStandard),
+    Cpp(CppStandard),
 }
 
 #[derive(Debug, Clone, clap::ValueEnum, Default, Serialize, Deserialize)]
@@ -339,6 +346,64 @@ impl PathsConfig {
     /// Returns `true` if no path settings are specified (all fields are `None` or empty).
     pub fn is_empty(&self) -> bool {
         self.src_dir.is_none() && self.include.is_none() && self.custom.is_empty()
+    }
+}
+
+//region LanguageStandard Implementations
+impl Default for LanguageStandard {
+    fn default() -> Self {
+        LanguageStandard::C(CStandard::default())
+    }
+}
+
+impl From<CStandard> for LanguageStandard {
+    fn from(std: CStandard) -> Self {
+        LanguageStandard::C(std)
+    }
+}
+
+impl From<CppStandard> for LanguageStandard {
+    fn from(std: CppStandard) -> Self {
+        LanguageStandard::Cpp(std)
+    }
+}
+
+impl LanguageStandard {
+    pub fn language(&self) -> Language {
+        match self {
+            LanguageStandard::C(_) => Language::C,
+            LanguageStandard::Cpp(_) => Language::Cpp,
+        }
+    }
+
+    pub fn c_standard(&self) -> CStandard {
+        match self {
+            LanguageStandard::C(std) => std.clone(),
+            LanguageStandard::Cpp(_) => CStandard::default(),
+        }
+    }
+
+    pub fn cpp_standard(&self) -> Option<CppStandard> {
+        match self {
+            LanguageStandard::C(_) => None,
+            LanguageStandard::Cpp(std) => Some(std.clone()),
+        }
+    }
+}
+
+impl std::str::FromStr for LanguageStandard {
+    type Err = String;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        use clap::ValueEnum;
+
+        if let Ok(c) = CStandard::from_str(s, true) {
+            return Ok(LanguageStandard::C(c));
+        }
+        if let Ok(cpp) = CppStandard::from_str(s, true) {
+            return Ok(LanguageStandard::Cpp(cpp));
+        }
+        Err(format!("invalid language standard: '{}'", s))
     }
 }
 

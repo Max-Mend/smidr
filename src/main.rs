@@ -38,10 +38,10 @@ fn run() -> error::Result<()> {
                 (None, true) => config::ProjectType::StaticLibrary,
                 (None, false) => config::ProjectType::Binary,
             };
-            project::Project::init(name, project_type, std.clone())
+            project::Project::init(name, project_type, std.clone().map(Into::into))
         }
         Commands::Build { release } => build_current(*release),
-        Commands::Run { release } => run_current(*release),
+        Commands::Run { release, .. } => run_current(*release),
         Commands::Clean => {
             let project = project::Project::load(&std::env::current_dir()?)?;
             builder::clean_project(&project)
@@ -63,6 +63,7 @@ fn run() -> error::Result<()> {
             let mut project = project::Project::load(&std::env::current_dir()?)?;
             project.remove_dependency(name)
         }
+        Commands::Update => builder::update_project(),
     }
 }
 
@@ -70,12 +71,12 @@ fn build_current(release: bool) -> error::Result<()> {
     let cwd = std::env::current_dir()?;
     let raw_config = config::ManifestConfig::load(&cwd)?;
 
-    // Якщо є workspace-члени - збудуй їх спочатку
+    // If there are workspace members - build them first
     if let Some(workspace) = &raw_config.workspace {
         build_workspace(&cwd, workspace, release)?;
     }
 
-    // Якщо в корені є [project] - збудуй і сам корінь
+    // If there is a [project] section in the root - build it too
     if raw_config.project.is_some() {
         let mut project = project::Project::load(&cwd)?;
         project.resolve_dependencies(release)?;

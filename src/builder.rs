@@ -71,7 +71,7 @@ pub fn build_project(project: &Project, release: bool) -> Result<()> {
     let build_dir = project.build_dir.join(profile_dir);
     std::fs::create_dir_all(&build_dir)?;
 
-    let compiler = compiler_binary(&build_section.compiler)?;
+    let compiler = compiler_binary(&build_section.compiler, &project_section.language)?;
     println!("Using compiler: {}", compiler);
 
     let profile = if release {
@@ -125,7 +125,16 @@ pub fn build_project(project: &Project, release: bool) -> Result<()> {
         if profile.debug_symbols {
             cmd.arg("-g");
         }
-        cmd.arg(format!("-std={}", project_section.c_standard));
+        let std_flag = match project_section.language {
+            crate::config::Language::C => format!("-std={}", project_section.c_standard),
+            crate::config::Language::Cpp => format!(
+                "-std={}",
+                project_section.cpp_standard.as_ref()
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| crate::config::CppStandard::default().to_string())
+            ),
+        };
+        cmd.arg(std_flag);
 
         // Recording the actual command used for this specific file -
         // doing it before .output(), while cmd is still available for formatting,
@@ -345,48 +354,25 @@ pub fn fmt_project(project: &Project) -> Result<()> {
 /// Returns [`crate::error::BuildError::CompilerNotFound`] if the
 /// requested compiler (or, for `Auto`, none of the candidates) is found
 /// on `PATH`.
-fn compiler_binary(kind: &crate::config::CompilerKind) -> Result<&'static str> {
-    use crate::config::CompilerKind;
+fn compiler_binary(kind: &crate::config::CompilerKind, language: &crate::config::Language) -> Result<&'static str> {
+    use crate::config::{CompilerKind, Language};
 
-    match kind {
-        CompilerKind::Gcc => {
-            if command_exists("gcc") {
-                Ok("gcc")
-            } else {
-                Err(crate::error::BuildError::CompilerNotFound(
-                    "gcc".to_string(),
-                ))
-            }
-        }
-        CompilerKind::Tcc => {
-            if command_exists("tcc") {
-                Ok("tcc")
-            } else {
-                Err(crate::error::BuildError::CompilerNotFound(
-                    "tcc".to_string(),
-                ))
-            }
-        }
-        CompilerKind::Clang => {
-            if command_exists("clang") {
-                Ok("clang")
-            } else {
-                Err(crate::error::BuildError::CompilerNotFound(
-                    "clang".to_string(),
-                ))
-            }
-        }
-        CompilerKind::Auto => {
-            for candidate in ["clang", "tcc", "cc", "gcc"] {
-                if command_exists(candidate) {
-                    return Ok(candidate);
-                }
-            }
-            Err(crate::error::BuildError::CompilerNotFound(
-                "clang, tcc, cc, gcc".to_string(),
-            ))
+    let candidates: &[&str] = match (kind, language) {
+        (CompilerKind::Gcc, Language::C) => &["gcc"],
+        (CompilerKind::Gcc, Language::Cpp) => &["g++"],
+        (CompilerKind::Clang, Language::C) => &["clang"],
+        (CompilerKind::Clang, Language::Cpp) => &["clang++"],
+        (CompilerKind::Tcc, _) => &["tcc"],
+        (CompilerKind::Auto, Language::C) => &["clang", "tcc", "cc", "gcc"],
+        (CompilerKind::Auto, Language::Cpp) => &["clang++", "g++"],
+    };
+
+    for candidate in candidates {
+        if command_exists(candidate) {
+            return Ok(candidate);
         }
     }
+    Err(crate::error::BuildError::CompilerNotFound(candidates.join(", ")))
 }
 
 /// Check whether `name` is a runnable compiler on `PATH`, by attempting
@@ -400,3 +386,51 @@ fn command_exists(name: &str) -> bool {
         .map(|status| status.success())
         .unwrap_or(false)
 }
+
+pub fn lint_project(project: &Project) -> Result<()> {
+    let project_section = project.config.project.as_ref().ok_or_else(|| {
+        crate::error::BuildError::Dependency {
+            name: project.root.display().to_string(),
+            reason: "cannot lint: Smidr.toml has no [project] section".to_string(),
+        }
+    })?;
+
+    let files = project.source_files()?;
+
+    let clang_binary = match project_section.language {
+        crate::config::Language::C => "clang",
+        crate::config::Language::Cpp => "clang++",
+    };
+
+    let mut cmd = std::process::Command::new(clang_binary);
+    cmd.arg("-fsyntax-only");
+    cmd.args(&files);
+
+    let status = cmd.status()?;
+    if !status.success() {
+        return Err(crate::error::BuildError::CommandFailed {
+            cmd: clang_binary.to_string(),
+            code: status.code(),
+        });
+    }
+
+    println!("Linted {} file(s).", files.len());
+    Ok(())
+}
+
+pub fn update_project() -> Result<()> {
+    let status = std::process::Command::new("cargo")
+        .args(["install", "smidr", "--force"])
+        .status()?;
+
+    if !status.success() {
+        return Err(crate::error::BuildError::CompilerNotFound(
+            "cargo".to_string(),
+        ));
+    }
+
+    println!("Smidr updated successfully!");
+    
+    Ok(())
+}
+    

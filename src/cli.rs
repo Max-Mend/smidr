@@ -10,12 +10,12 @@
 //! layer can be tested (or replaced) independently of the underlying
 //! logic.
 
-use crate::config::{CStandard, ProjectType};
+use crate::config::{LanguageStandard, ProjectType};
 use clap::{Parser, Subcommand};
 
 /// Top-level CLI definition for the `smidr` binary.
 #[derive(Parser)]
-#[command(name = "Smidr", version = "0.7.0", long_about = None)]
+#[command(name = "Smidr", version = "0.8.0", long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
@@ -38,10 +38,10 @@ pub enum Commands {
         /// specifically need a shared object).
         #[arg(long)]
         lib: bool,
-        /// Specify the C standard to use (e.g., c99, c11, c17, c23).
+        /// Specify the C or C++ language standard to use (e.g., c17, c23, cpp20).
         /// Defaults to c17.
-        #[arg(long, value_enum)]
-        std: Option<CStandard>,
+        #[arg(long)]
+        std: Option<LanguageStandard>,
     },
     /// Compile the current project.
     #[command(alias = "b")]
@@ -54,6 +54,12 @@ pub enum Commands {
     Run {
         #[arg(long)]
         release: bool,
+
+        #[arg(long)]
+        verbose: bool,
+
+        #[arg(long)]
+        dry_run: bool,
     },
     /// Remove the `target/` build directory.
     #[command(alias = "cl")]
@@ -73,11 +79,12 @@ pub enum Commands {
     /// Remove a dependency from the project.
     #[command(alias = "rm")]
     Remove { name: String },
+    /// Update smidr to the latest version.
+    #[command(alias = "up")]
+    Update,
 
     // TODO: Add:
-    // Analyze, // analyze code
     // Lint, // lint code
-    // Update, // update smidr
 }
 
 /// Parse `std::env::args()` into a [`Cli`], exiting the process with a
