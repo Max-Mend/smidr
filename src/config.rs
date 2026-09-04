@@ -48,8 +48,8 @@ pub struct ProjectSection {
     pub project_type: ProjectType,
     #[serde(default)]
     pub language: Language,
-    #[serde(default)]
-    pub c_standard: CStandard,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+pub c_standard: Option<CStandard>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cpp_standard: Option<CppStandard>,
     pub authors: Vec<String>,
@@ -376,10 +376,10 @@ impl LanguageStandard {
         }
     }
 
-    pub fn c_standard(&self) -> CStandard {
+    pub fn c_standard(&self) -> Option<CStandard> {
         match self {
-            LanguageStandard::C(std) => std.clone(),
-            LanguageStandard::Cpp(_) => CStandard::default(),
+            LanguageStandard::C(std) => Some(std.clone()),
+            LanguageStandard::Cpp(_) => None,
         }
     }
 

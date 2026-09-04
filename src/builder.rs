@@ -126,7 +126,10 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
             cmd.arg("-g");
         }
         let std_flag = match project_section.language {
-            crate::config::Language::C => format!("-std={}", project_section.c_standard),
+            crate::config::Language::C => format!(
+                "-std={}",
+                project_section.c_standard.clone().unwrap_or_default()
+            ),
             crate::config::Language::Cpp => format!(
                 "-std={}",
                 project_section.cpp_standard.as_ref()

@@ -118,7 +118,7 @@ impl Project {
                 if std.language() == Language::C { "c" } else { "cpp" },
                 if std.language() == Language::C { "h" } else { "hpp" },
             ),
-            None => (Language::C, CStandard::default(), None, "c", "h"),
+            None => (Language::C, Some(CStandard::default()), None, "c", "h"),
         };
 
         match project_type {
