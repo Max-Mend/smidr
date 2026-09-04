@@ -301,7 +301,7 @@ impl Project {
     ) -> Result<()> {
         if dep_root.join("Smidr.toml").exists() {
             let dep_project = crate::project::Project::load(dep_root)?;
-            crate::builder::build_project(&dep_project, is_release)?;
+            crate::builder::build_project(&dep_project, is_release, false, false)?;
 
             let dep_include = dep_root.join("include");
             let profile_dir = if is_release { "target/release" } else { "target/debug" };

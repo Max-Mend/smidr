@@ -40,16 +40,16 @@ fn run() -> error::Result<()> {
             };
             project::Project::init(name, project_type, std.clone().map(Into::into))
         }
-        Commands::Build { release } => build_current(*release),
-        Commands::Run { release, .. } => run_current(*release),
+        Commands::Build { release, verbose, dry_run } => build_current(*release, *verbose, *dry_run),
+        Commands::Run { release, verbose, dry_run } => run_current(*release, *verbose, *dry_run),
         Commands::Clean => {
             let project = project::Project::load(&std::env::current_dir()?)?;
             builder::clean_project(&project)
         }
-        Commands::Rebuild { release } => {
+        Commands::Rebuild { release, verbose, dry_run } => {
             let mut project = project::Project::load(&std::env::current_dir()?)?;
             project.resolve_dependencies(*release)?;
-            builder::rebuild_project(&project, *release)
+            builder::rebuild_project(&project, *release, *verbose, *dry_run)
         }
         Commands::Format => {
             let project = project::Project::load(&std::env::current_dir()?)?;
@@ -63,30 +63,34 @@ fn run() -> error::Result<()> {
             let mut project = project::Project::load(&std::env::current_dir()?)?;
             project.remove_dependency(name)
         }
+        Commands::Lint => {
+            let project = project::Project::load(&std::env::current_dir()?)?;
+            builder::lint_project(&project)
+        }
         Commands::Update => builder::update_project(),
     }
 }
 
-fn build_current(release: bool) -> error::Result<()> {
+fn build_current(release: bool, verbose: bool, dry_run: bool) -> error::Result<()> {
     let cwd = std::env::current_dir()?;
     let raw_config = config::ManifestConfig::load(&cwd)?;
 
     // If there are workspace members - build them first
     if let Some(workspace) = &raw_config.workspace {
-        build_workspace(&cwd, workspace, release)?;
+        build_workspace(&cwd, workspace, release, verbose, dry_run)?;
     }
 
     // If there is a [project] section in the root - build it too
     if raw_config.project.is_some() {
         let mut project = project::Project::load(&cwd)?;
         project.resolve_dependencies(release)?;
-        builder::build_project(&project, release)?;
+        builder::build_project(&project, release, verbose, dry_run)?;
     }
 
     Ok(())
 }
 
-fn run_current(release: bool) -> error::Result<()> {
+fn run_current(release: bool, verbose: bool, dry_run: bool) -> error::Result<()> {
     let cwd = std::env::current_dir()?;
     let raw_config = config::ManifestConfig::load(&cwd)?;
 
@@ -99,18 +103,20 @@ fn run_current(release: bool) -> error::Result<()> {
     }
 
     if let Some(workspace) = &raw_config.workspace {
-        build_workspace(&cwd, workspace, release)?;
+        build_workspace(&cwd, workspace, release, verbose, dry_run)?;
     }
 
     let mut project = project::Project::load(&cwd)?;
     project.resolve_dependencies(release)?;
-    builder::run_project(&project, release)
+    builder::run_project(&project, release, verbose, dry_run)
 }
 
 fn build_workspace(
     root: &std::path::Path,
     workspace: &config::WorkspacesConfig,
     release: bool,
+    verbose: bool,
+    dry_run: bool,
 ) -> error::Result<()> {
     for member in &workspace.members {
         let member_path = root.join(member);
@@ -118,7 +124,7 @@ fn build_workspace(
 
         let mut member_project = project::Project::load(&member_path)?;
         member_project.resolve_dependencies(release)?;
-        builder::build_project(&member_project, release)?;
+        builder::build_project(&member_project, release, verbose, dry_run)?;
     }
     Ok(())
 }

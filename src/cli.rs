@@ -48,6 +48,12 @@ pub enum Commands {
     Build {
         #[arg(long)]
         release: bool,
+
+        #[arg(long)]
+        verbose: bool,
+
+        #[arg(long)]
+        dry_run: bool,
     },
     /// Compile and run the current project.
     #[command(alias = "r")]
@@ -69,6 +75,12 @@ pub enum Commands {
     Rebuild {
         #[arg(long)]
         release: bool,
+
+        #[arg(long)]
+        verbose: bool,
+        
+        #[arg(long)]
+        dry_run: bool,
     },
     /// Format project source and header files with clang-format.
     #[command(alias = "fmt")]
@@ -79,12 +91,12 @@ pub enum Commands {
     /// Remove a dependency from the project.
     #[command(alias = "rm")]
     Remove { name: String },
+    /// Check source files for syntax errors without compiling.
+    #[command(alias = "l")]
+    Lint,
     /// Update smidr to the latest version.
     #[command(alias = "up")]
     Update,
-
-    // TODO: Add:
-    // Lint, // lint code
 }
 
 /// Parse `std::env::args()` into a [`Cli`], exiting the process with a

@@ -50,7 +50,7 @@ pub struct CompileOptions {
 /// compiler is found, [`crate::error::BuildError::Compile`] if a source
 /// file fails to compile, or [`crate::error::BuildError::Link`] if the
 /// final link step fails.
-pub fn build_project(project: &Project, release: bool) -> Result<()> {
+pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: bool) -> Result<()> {
     let project_section = project.config.project.as_ref().ok_or_else(|| {
         crate::error::BuildError::Dependency {
             name: project.root.display().to_string(),
@@ -141,6 +141,21 @@ pub fn build_project(project: &Project, release: bool) -> Result<()> {
         // and after all arguments have been added.
         let command_str = format!("{:?}", cmd);
 
+        if verbose || dry_run {
+            println!("   $ {}", command_str);
+        }
+
+        if dry_run {
+            compile_commands.push(CompileCommand {
+                directory: project.root.display().to_string(),
+                file: src.display().to_string(),
+                command: command_str,
+                output: obj_path.display().to_string(),
+            });
+            object_files.push(obj_path);
+            continue;
+        }
+
         let output = cmd.output()?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -200,6 +215,13 @@ pub fn build_project(project: &Project, release: bool) -> Result<()> {
             if profile.lto { link_cmd.arg("-flto"); }
             if profile.strip { link_cmd.arg("-s"); }
 
+            if verbose || dry_run {
+                println!("   $ {:?}", link_cmd);
+            }
+            if dry_run {
+                return Ok(());
+            }
+
             let output = link_cmd.output()?;
             if !output.status.success() {
                 return Err(crate::error::BuildError::Link(
@@ -254,8 +276,14 @@ pub fn build_project(project: &Project, release: bool) -> Result<()> {
 /// Propagates any error from [`build_project`]. Returns
 /// [`crate::error::BuildError::CommandFailed`] if the binary itself
 /// exits with a non-zero status.
-pub fn run_project(project: &Project, release: bool) -> Result<()> {
-    build_project(project, release)?;
+pub fn run_project(project: &Project, release: bool, verbose: bool, dry_run: bool) -> Result<()> {
+    build_project(project, release, verbose, dry_run)?;
+
+    if dry_run {
+        println!("Dry run: skipping execution.");
+        return Ok(());
+    }
+
     let project_section = project.config.project.as_ref().ok_or_else(|| {
         crate::error::BuildError::Dependency {
             name: project.root.display().to_string(),
@@ -297,9 +325,9 @@ pub fn clean_project(project: &Project) -> Result<()> {
     Ok(())
 }
 
-pub fn rebuild_project(project: &Project, release: bool) -> Result<()> {
+pub fn rebuild_project(project: &Project, release: bool, verbose: bool, dry_run: bool) -> Result<()> {
     clean_project(project)?;
-    build_project(project, release)
+    build_project(project, release, verbose, dry_run)
 }
 
 /// Format project source and header files with clang-format.
