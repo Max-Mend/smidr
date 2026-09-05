@@ -206,7 +206,12 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
     match project_section.project_type {
         // Binary
         crate::config::ProjectType::Binary => {
-            let binary_path = build_dir.join("bin").join(output_name);
+            let binary_name = if cfg!(windows) {
+                format!("{}.exe", output_name)
+            } else {
+                output_name.to_string()
+            };
+            let binary_path = build_dir.join("bin").join(binary_name);
 
             let mut link_cmd = std::process::Command::new(&opts.compiler);
             link_cmd.args(&object_files);
@@ -235,7 +240,8 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
 
         // Static library
         crate::config::ProjectType::StaticLibrary => {
-            let lib_path = build_dir.join("bin").join(format!("lib{}.a", output_name));
+            let lib_ext = if cfg!(windows) { "lib" } else { "a" };
+            let lib_path = build_dir.join("bin").join(format!("lib{}.{}", output_name, lib_ext));
 
             let mut ar_cmd = std::process::Command::new("ar");
             ar_cmd.arg("rcs").arg(&lib_path).args(&object_files);
@@ -250,7 +256,8 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
 
         // Shared library
         crate::config::ProjectType::SharedLibrary => {
-            let lib_path = build_dir.join("bin").join(format!("lib{}.so", output_name));
+            let lib_ext = if cfg!(windows) { "dll" } else { "so" };
+            let lib_path = build_dir.join("bin").join(format!("lib{}.{}", output_name, lib_ext));
 
             let mut link_cmd = std::process::Command::new(&opts.compiler);
             link_cmd.arg("-shared").args(&object_files);
@@ -294,12 +301,15 @@ pub fn run_project(project: &Project, release: bool, verbose: bool, dry_run: boo
         }
     })?;
     let profile_dir = if release { "release" } else { "debug" };
-    let binary_path = project.build_dir.join(profile_dir).join("bin").join(
-        project_section
-            .output_name
-            .as_ref()
-            .unwrap_or(&project_section.name),
-    );
+
+    let output_name = project_section.output_name.as_ref().unwrap_or(&project_section.name);
+    let binary_name = if cfg!(windows) {
+        format!("{}.exe", output_name)
+    } else {
+        output_name.clone()
+    };
+
+    let binary_path = project.build_dir.join(profile_dir).join("bin").join(binary_name);
 
     println!("Running: {}", binary_path.display());
     let status = std::process::Command::new(&binary_path).status()?;
