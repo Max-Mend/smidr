@@ -21,7 +21,7 @@ pub enum SourceLocation {
     Git { url: String, tag: Option<String> },
     /// A system library, resolved via local search or `pkg-config`.
     /// Not yet consumed anywhere - see [`resolve`].
-    System { version: String },
+    System,
 }
 
 /// A system library found via a local search or `pkg-config`.
@@ -91,8 +91,8 @@ pub fn resolve_system_lib(name: &str) -> Result<SystemLibInfo> {
 /// dependency is specified (not yet supported).
 pub fn resolve(name: &str, spec: &DependencySpec, project_root: &Path) -> Result<SourceLocation> {
     match spec {
-        DependencySpec::Version(version) => {
-            Ok(SourceLocation::System { version: version.clone() })
+        DependencySpec::Version(_version) => {
+            Ok(SourceLocation::System)
         }
 
         DependencySpec::Detailed { git, path, tag, .. } => {

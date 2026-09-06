@@ -15,21 +15,41 @@
 
 </div>
 
-Smidr is a `cargo`- inspired build tool for C projects, meant to bridge dependencies across different build systems into a single build.
+## What is Smidr?
+
+Smidr is a `cargo`-inspired build tool for C and C++. Instead of hand-writing a Makefile or a `CMakeLists.txt`, you describe your project in one `Smidr.toml` file, and Smidr scaffolds it, compiles it, resolves its dependencies, and links it - across binaries, static libraries, and shared libraries.
+
+It's not a replacement for CMake or Meson in large, established codebases - it's for the everyday case: you want to start a C/C++ project, add a couple of libraries, and build it, without maintaining a build script by hand.
 
 ## Why
 
-Working with C projects usually means hand-writing a Makefile, CMakeLists.txt, or invoking the compiler directly. `Smidr` handles that:
+- **One command to start**: `smidr new` scaffolds a working project, no boilerplate to copy
+- **Dependencies without ceremony**: a system library, a local project, or a git repository are all just an entry in `[dependencies]`
+- **Not tied to one compiler**: works with `clang`, `gcc`, or `tcc`, on Linux, macOS, or Windows (with MinGW/Clang)
+- **Bridges other build systems**: a dependency that itself uses CMake or Meson is built through Smidr transparently
+- **Plain TOML, not a scripting language**: `Smidr.toml` is data, not a program to debug
 
-- scaffolds a new project
-- discovers and compiles `.c` sources
-- links the result into a binary
-- keeps project configuration in a plain `Smidr.toml`, not a bespoke build script
-- is not tied to a specific compiler (clang, tcc, gcc, or the system `cc`)
+## Quick start (1 minute)
+
+```sh
+cargo install smidr
+smidr new hello
+cd hello
+smidr run
+```
+
+```console
+$ smidr run
+Using compiler: clang
+Running: target/debug/bin/hello
+Hello, World!
+```
+
+That's it - `smidr new` scaffolds a project, `smidr run` compiles and executes it.
 
 ## Installation
 
-Requires Rust 1.85 or newer (this project uses the 2024 edition). Tested with Rust 1.96.0.
+Requires Rust 1.85 or newer (Smidr uses the 2024 edition). Tested with Rust 1.96.0.
 
 ```sh
 cargo install smidr
@@ -43,23 +63,35 @@ cd smidr
 cargo install --path .
 ```
 
+### Linux / macOS
+
+Just needs a C/C++ compiler already on your system - `clang`, `gcc`, or `tcc`. Most Linux distributions and macOS (via Xcode Command Line Tools) already have one.
+
+### Windows
+
+Smidr itself runs natively on Windows, but it needs a GCC or Clang toolchain in `PATH` to actually compile anything - Windows has no compiler out of the box.
+
+The simplest way to get one:
+
+1. Install [MSYS2](https://www.msys2.org/)
+2. Open the **MSYS2 MinGW 64-bit** terminal and run:
+   `pacman -S mingw-w64-x86_64-gcc`
+3. Add `C:\msys64\mingw64\bin` to your system `PATH`
+4. Open a **new** terminal and confirm with `gcc --version`
+
+Binaries are written as `.exe`, static libraries as `.lib`, and shared libraries as `.dll` automatically. Native MSVC (`cl.exe`) support isn't implemented yet - see the [Roadmap](#roadmap).
+
 ## Usage
 
 ```sh
-smidr new hello
-cd hello
-smidr build
-smidr run
-```
-
-```console
-$ smidr new demo
-Created project: demo
-
-$ cd demo && smidr run
-Using compiler: cc
-Running: target/bin/demo
-Hello, World!
+smidr new hello              # scaffold a binary project
+smidr new mylib --lib        # scaffold a static library
+smidr new mylib --type dynamic --std cpp20   # a C++20 shared library
+smidr build                  # compile
+smidr build --release        # compile with optimizations
+smidr run                    # compile and run
+smidr fmt                    # format sources with clang-format
+smidr lint                   # check syntax without compiling
 ```
 
 `smidr new hello` scaffolds:
@@ -77,76 +109,106 @@ hello/
 
 | Command | Description |
 | --- | --- |
-| `smidr new <name>` | Scaffold a new project |
-| `smidr build` | Compile the project into `target/bin/` |
+| `smidr new <name>` | Scaffold a new project (`--lib`, `--type dynamic`, `--std <standard>`) |
+| `smidr build` | Compile the project (`--release`, `--verbose`, `--dry-run`) |
 | `smidr run` | Compile and run the resulting binary |
+| `smidr rebuild` | Clean, then compile from scratch |
+| `smidr clean` | Remove the `target/` build directory |
+| `smidr fmt` | Format source and header files with `clang-format` |
+| `smidr lint` | Check source files for syntax errors without compiling |
+| `smidr add <name>` | Add a dependency to `Smidr.toml` |
+| `smidr rm <name>` | Remove a dependency from `Smidr.toml` |
+| `smidr update` | Update Smidr itself to the latest version |
 
 ## Configuration
-
-Project metadata and build settings live in `Smidr.toml`:
 
 ```toml
 [project]
 name = "hello"
 version = "0.1.0"
-authors = []
-authors_email = []
+type = "bin"           # bin | static | dynamic
+language = "c"          # c | cpp
+c_standard = "c17"
 
 [build]
-compiler = "auto"      # auto | clang | tcc | gcc
-warnings = "standard"  # none | standard | strict
+compiler = "auto"       # auto | clang | tcc | gcc
 cflags = []
+libs = []
+linker_flags = []
 
 [dependencies]
-# external C libraries - see Roadmap
+zlib = "1.3"                                    # system library
+raylib = { git = "https://github.com/raysan5/raylib" }   # git, latest stable tag
+mymath = { path = "../mymath" }                  # local project
 ```
 
-| `[build]` field | Values | Description |
-| --- | --- | --- |
-| `compiler` | `auto`, `clang`, `tcc`, `gcc` | `auto` tries, in order: `clang`, `tcc`, the system `cc`, then `gcc` |
-| `warnings` | `none`, `standard`, `strict` | `standard` adds `-Wall -Wextra`; `strict` adds `-Werror -Wpedantic` |
-| `cflags` | list of strings | additional flags passed to the compiler |
+### Dependencies
 
-### A note on `[dependencies]`
+A dependency can come from three places:
 
-The `[dependencies]` section is parsed but not yet wired into the build - see [Roadmap](#roadmap). Once it is, be aware that `build_system = "custom"` runs arbitrary shell commands defined in `build_commands`. Only use a `Smidr.toml` from a source you trust, the same way you would with any shell script.
+- **A version string** (`zlib = "1.3"`) - resolved from a local header search, then `pkg-config`
+- **`path`** - a local directory. If it has its own `Smidr.toml`, it's built recursively with Smidr; otherwise Smidr detects and drives its CMake/Meson/Make build
+- **`git`** - cloned at a pinned `tag`, or the latest stable release tag if none is given, then resolved the same way as `path`
+
+> `build_system = "custom"` runs arbitrary shell commands from `build_commands` in `Smidr.toml`. Only use a `Smidr.toml` from a source you trust, the same way you would with any shell script.
+
+### Workspaces
+
+A `Smidr.toml` can also organize several projects:
+
+```toml
+[workspace]
+members = ["core", "app"]
+```
+
+This works whether or not the root itself has a `[project]` section - a pure organizational root just builds its members; a root with its own `[project]` builds itself too.
+
+### Custom source directories
+
+```toml
+[paths]
+src_dir = "sources"    # override the default "src"
+include = "headers"     # override the default "include"
+core = "core"            # any extra name compiles alongside src_dir
+platform = "platform"
+```
 
 ## Examples
 
-- [Ricochet](https://github.com/Max-Mend/ricochet) - a DVD-logo-style terminal screensaver, built entirely with `Smidr` using only the C standard library.
+- [Ricochet](https://github.com/Max-Mend/ricochet) - a DVD-logo-style terminal screensaver, built entirely with Smidr using only the C standard library. (Ricochet was built with Smidr **0.1.0**.)
 
-## Architecture
+## FAQ / Troubleshooting
 
-```
-src/
-├── main.rs         entry point, CLI dispatch
-├── cli.rs           command definitions (clap)
-├── config.rs        smidr.toml types and (de)serialization
-├── project.rs        project model: init, load, source discovery
-├── builder.rs         compilation and linking
-├── resolver.rs        dependency source resolution (git or local path)
-├── compile_db.rs       compile_commands.json generation, for clangd and other LSPs
-├── error.rs           the crate's error type
-└── toolchain/          build-system abstraction for dependencies
-    ├── cmake.rs
-    ├── meson.rs
-    ├── make.rs
-    └── custom.rs
-```
+**`Error: Compiler 'clang, tcc, cc, gcc' not found.`**
+No C/C++ compiler is on your `PATH`. On Linux/macOS, install one via your package manager (`apt install clang`, `xcode-select --install`, etc.). On Windows, see [Installation](#windows).
 
-Each external process (the compiler, `cmake`, `meson`) is invoked behind a dedicated, isolated layer. `Smidr` itself is not tied to any single build tool.
+**`Error: Dependency '<name>' failed: not found locally or via pkg-config`**
+The system library isn't installed, or has no `pkg-config` entry. Install it via your package manager, or use a `path`/`git` dependency instead.
+
+**`cannot build: Smidr.toml has no [project] section (this is a workspace root)`**
+You ran `smidr run` from a workspace root that only organizes other projects. Run from inside a specific member directory instead.
+
+**`No .h files found in include/`**
+A `static` or `dynamic` library project needs at least one header in `include/` (or your `[paths] include` directory) - otherwise nothing else can use it.
+
+**A `path`/`git` dependency isn't being picked up.**
+Check that its `Smidr.toml` is valid on its own (`cd` into it and run `smidr build` directly) - a broken dependency manifest fails the same way a broken top-level one would.
+
+**How do I pass custom CMake flags?**
+The built-in `build_system = "cmake"` uses fixed flags. For custom `-D...` options, use `build_system = "custom"` with your own `build_commands` and `$SMIDR_PREFIX`.
+
+**Does `smidr lint` work without a full build?**
+Yes. It runs `clang`/`clang++ -fsyntax-only` and does not produce binaries.
 
 ## Roadmap
 
-- [x] `smidr new` - project scaffolding
-- [x] `smidr build` / `smidr run` - compile and run
-- [x] Compiler-agnostic builds, with auto-detection (clang, tcc, gcc)
-- [ ] `compile_commands.json` generation - implemented, not yet wired into `build`
-- [ ] Local (`path =`) dependencies - resolver implemented, not yet wired into `build`
-- [ ] Build-system auto-detection for dependencies (CMake, Meson, Make) - implemented, not yet wired into `build`
-- [ ] Git dependencies
-- [ ] Linking against CMake/Meson-built libraries (`pkg-config` resolution)
-- [ ] MSVC support
+- [x] Project scaffolding, compiler-agnostic builds (clang, tcc, gcc)
+- [x] C++ support (compiler selection, standards, scaffolding)
+- [x] System, `path`, and `git` dependencies; CMake/Meson/Make bridging
+- [x] Workspaces, custom source directories, build profiles
+- [x] Windows support via MinGW/Clang
+- [ ] Native MSVC support
+- [ ] A modular system for optional, downloadable capabilities (e.g. `smidr module add <name>`) for things like kernel/bare-metal targets, kept out of the base install
 
 ## Contributing
 

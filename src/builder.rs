@@ -13,18 +13,10 @@
 //! here yet (see the crate's roadmap).
 
 use crate::compile_db::CompileCommand;
-use crate::diagnostics::{Diagnostic, print_diagnostic};
+use crate::diagnostics::{parse_all, print_all};
 use crate::error::Result;
 use crate::project::Project;
 use std::path::PathBuf;
-
-/// A single compiled `.c` file, paired with the exact command used to
-/// produce it. Currently unused - intended for feeding
-/// [`crate::compile_db`] once that's wired into `build_project`.
-pub struct CompiledObject {
-    obj_path: PathBuf,
-    compile_command: String,
-}
 
 /// Everything needed to invoke the compiler: which binary, which include
 /// paths, and which extra flags.
@@ -116,6 +108,7 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
                 .map(|p| format!("-I{}", p.display()))
                 .collect::<Vec<_>>(),
         );
+        cmd.args(&opts.cflags);
         cmd.arg(match profile.opt_level {
             crate::config::OptLevel::None => "-O0",
             crate::config::OptLevel::Speed => "-O2",
@@ -160,21 +153,18 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
         }
 
         let output = cmd.output()?;
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let mut printed_pretty = false;
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let diagnostics = parse_all(&stderr);
 
-            for line in stderr.lines() {
-                if let Some(diag) = Diagnostic::parse_line(line) {
-                    print_diagnostic(&diag);
-                    printed_pretty = true;
-                    break;
-                }
-            }
-            let error_detail = if printed_pretty {
-                "See error details above...".to_string()
-            } else {
+        if !diagnostics.is_empty() {
+            print_all(&diagnostics);
+        }
+
+        if !output.status.success() {
+            let error_detail = if diagnostics.is_empty() {
                 stderr.to_string()
+            } else {
+                "See error details above...".to_string()
             };
 
             return Err(crate::error::BuildError::Compile(
