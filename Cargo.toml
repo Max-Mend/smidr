@@ -1,17 +1,17 @@
 [package]
 name = "smidr"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2024"
 authors = ["Max-Mend"]
-description = "Smidr is a cargo-inspired build tool for C projects, meant to bridge dependencies across different build systems into a single build."
+description = "Smidr is a cargo-inspired build tool for C/C++ projects, meant to bridge dependencies across different build systems into a single build."
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Max-Mend/smidr"
 readme = "README.md"
 keywords = [
     "c",
-    "build-tool",
+    "cpp",
     "cli",
-    "compiler",
+    "toolchain",
     "build-system",
 ]
 categories = ["development-tools", "command-line-utilities"]

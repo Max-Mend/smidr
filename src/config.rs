@@ -153,6 +153,7 @@ pub enum DependencySpec {
         git: Option<String>,
         path: Option<String>,
         tag: Option<String>,
+        branch: Option<String>,
         #[serde(default)]
         build_system: BuildSystemKind,
         #[serde(default)]

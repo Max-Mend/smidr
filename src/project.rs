@@ -278,9 +278,9 @@ impl Project {
                 SourceLocation::Path(dep_root) => {
                     self.build_and_register_dep(name, spec, &dep_root, is_release)?;
                 }
-                SourceLocation::Git { url, tag } => {
+                SourceLocation::Git { url, tag, branch } => {
                     let dest = self.build_dir.join("deps-src").join(name);
-                    let dep_root = resolver::resolve_git(name, &url, &tag, &dest)?;
+                    let dep_root = resolver::resolve_git(name, &url, &tag, &branch, &dest)?;
                     self.build_and_register_dep(name, spec, &dep_root, is_release)?;
                 }
             }
