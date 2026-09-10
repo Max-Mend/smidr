@@ -5,32 +5,29 @@
 //! Resolves where a dependency's source actually lives on disk.
 //!
 //! This module only answers "where is the source?" - it has no opinion
-//! on how that source gets built (that's [`crate::toolchain`]). 
+//! on how that source gets built (that's [`crate::toolchain`]).
 //! `path` dependencies are resolved directly; `git` dependencies are
 //! cloned (at a pinned tag, or the latest stable release if none is
 //! given) before being resolved the same way as `path`.
 
 use crate::config::DependencySpec;
 use crate::error::{BuildError, Result};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 /// Where a dependency's source was found.
 pub enum SourceLocation {
     Path(PathBuf),
-<<<<<<< HEAD
-    Git { url: String, tag: Option<String> },
-=======
     Git {
         url: String,
         tag: Option<String>,
         branch: Option<String>,
         rev: Option<String>,
     },
->>>>>>> 23f4bb8 (feat: git rev support, global cache for cloned dependencies (Cargo-style))
     /// A system library, resolved via local search or `pkg-config`.
     /// Not yet consumed anywhere - see [`resolve`].
-    System { version: String },
+    System,
 }
 
 /// A system library found via a local search or `pkg-config`.
@@ -54,8 +51,14 @@ fn check_known_paths(name: &str) -> Option<SystemLibInfo> {
 }
 
 fn try_pkg_config(name: &str) -> Option<SystemLibInfo> {
-    let cflags_out = Command::new("pkg-config").args(["--cflags", name]).output().ok()?;
-    let libs_out = Command::new("pkg-config").args(["--libs", name]).output().ok()?;
+    let cflags_out = Command::new("pkg-config")
+        .args(["--cflags", name])
+        .output()
+        .ok()?;
+    let libs_out = Command::new("pkg-config")
+        .args(["--libs", name])
+        .output()
+        .ok()?;
 
     if !cflags_out.status.success() || !libs_out.status.success() {
         return None;
@@ -100,18 +103,8 @@ pub fn resolve_system_lib(name: &str) -> Result<SystemLibInfo> {
 /// dependency is specified (not yet supported).
 pub fn resolve(name: &str, spec: &DependencySpec, project_root: &Path) -> Result<SourceLocation> {
     match spec {
-        DependencySpec::Version(version) => {
-            Ok(SourceLocation::System { version: version.clone() })
-        }
+        DependencySpec::Version(_version) => Ok(SourceLocation::System),
 
-<<<<<<< HEAD
-        DependencySpec::Detailed { git, path, tag, .. } => {
-            match (git, path) {
-                (None, None) => Err(BuildError::Dependency {
-                    name: name.to_string(),
-                    reason: "no source specified: specify git or path in Smidr.toml".to_string(),
-                }),
-=======
         DependencySpec::Detailed {
             git,
             path,
@@ -124,32 +117,23 @@ pub fn resolve(name: &str, spec: &DependencySpec, project_root: &Path) -> Result
                 name: name.to_string(),
                 reason: "no source specified: specify git or path in Smidr.toml".to_string(),
             }),
->>>>>>> 23f4bb8 (feat: git rev support, global cache for cloned dependencies (Cargo-style))
 
-                (Some(_), Some(_)) => Err(BuildError::Dependency {
-                    name: name.to_string(),
-                    reason: "both git and path specified - ambiguous".to_string(),
-                }),
+            (Some(_), Some(_)) => Err(BuildError::Dependency {
+                name: name.to_string(),
+                reason: "both git and path specified - ambiguous".to_string(),
+            }),
 
-                (None, Some(local_path)) => {
-                    let full = project_root.join(local_path);
-                    if !full.exists() {
-                        return Err(BuildError::Dependency {
-                            name: name.to_string(),
-                            reason: format!("path not found: {}", full.display()),
-                        });
-                    }
-                    Ok(SourceLocation::Path(full))
+            (None, Some(local_path)) => {
+                let full = project_root.join(local_path);
+                if !full.exists() {
+                    return Err(BuildError::Dependency {
+                        name: name.to_string(),
+                        reason: format!("path not found: {}", full.display()),
+                    });
                 }
-
-<<<<<<< HEAD
-                (Some(git_url), None) => Ok(SourceLocation::Git {
-                    url: git_url.clone(),
-                    tag: tag.clone(),
-                }),
+                Ok(SourceLocation::Path(full))
             }
-        }
-=======
+
             (Some(git_url), None) => Ok(SourceLocation::Git {
                 url: git_url.clone(),
                 tag: tag.clone(),
@@ -157,7 +141,6 @@ pub fn resolve(name: &str, spec: &DependencySpec, project_root: &Path) -> Result
                 rev: rev.clone(),
             }),
         },
->>>>>>> 23f4bb8 (feat: git rev support, global cache for cloned dependencies (Cargo-style))
     }
 }
 
@@ -195,10 +178,6 @@ fn latest_stable_tag(tags: Vec<String>) -> Option<String> {
 }
 
 fn clone_at_tag(url: &str, tag: &str, dest: &Path) -> Result<()> {
-<<<<<<< HEAD
-    let status = Command::new("git")
-        .args(["clone", "--branch", tag, "--depth", "1", url])
-=======
     run_git_clone(url, dest, &["--branch", tag, "--depth", "1"]).map_err(|reason| {
         BuildError::Dependency {
             name: dest.display().to_string(),
@@ -256,16 +235,42 @@ fn run_git_clone(url: &str, dest: &Path, extra_args: &[&str]) -> std::result::Re
         .arg("--progress")
         .args(extra_args)
         .arg(url)
->>>>>>> 23f4bb8 (feat: git rev support, global cache for cloned dependencies (Cargo-style))
         .arg(dest)
-        .status()
-        .map_err(BuildError::Io)?;
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| e.to_string())?;
 
+    let mut stderr = child.stderr.take().expect("stderr was piped");
+    let mut captured = Vec::new();
+    let mut buf = [0u8; 4096];
+    loop {
+        let n = stderr.read(&mut buf).map_err(|e| e.to_string())?;
+        if n == 0 {
+            break;
+        }
+        let chunk = &buf[..n];
+        // Passthrough as-is: this keeps \r redraws intact so the
+        // progress meter animates the same way it would unpiped.
+        std::io::stderr()
+            .write_all(chunk)
+            .map_err(|e| e.to_string())?;
+        captured.extend_from_slice(chunk);
+    }
+
+    let status = child.wait().map_err(|e| e.to_string())?;
     if !status.success() {
-        return Err(BuildError::Dependency {
-            name: dest.display().to_string(),
-            reason: format!("failed to clone {} at tag {}", url, tag),
-        });
+        // Progress lines are separated by \r rather than \n, so pull the
+        // last non-empty segment on either separator for the error text.
+        let text = String::from_utf8_lossy(&captured).into_owned();
+        let last_line = text
+            .split(['\r', '\n'])
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .last()
+            .unwrap_or("")
+            .to_string();
+        return Err(last_line);
     }
     Ok(())
 }
@@ -331,12 +336,6 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
 
 /// Resolve a git dependency into a local path, cloning it (at the pinned
 /// tag, or the latest stable release if none is given) if not already cached.
-<<<<<<< HEAD
-pub fn resolve_git(name: &str, url: &str, tag: &Option<String>, dest: &Path) -> Result<PathBuf> {
-    let resolved_tag = match tag {
-        Some(t) => t.clone(),
-        None => {
-=======
 ///
 /// The actual `git clone` happens at most once per `url` + resolved ref,
 /// into a shared cache under [`global_cache_root`]; `dest` is then
@@ -378,23 +377,17 @@ pub fn resolve_git(
         (None, Some(t), _) => t.clone(),
         (None, None, Some(r)) => r.clone(),
         (None, None, None) => {
->>>>>>> 23f4bb8 (feat: git rev support, global cache for cloned dependencies (Cargo-style))
             let tags = list_tags(url)?;
             latest_stable_tag(tags).ok_or_else(|| BuildError::Dependency {
                 name: name.to_string(),
-                reason: "no stable release tags found; specify a tag explicitly".to_string(),
+                reason: "no stable release tags found; specify a tag or branch explicitly"
+                    .to_string(),
             })?
         }
     };
 
-<<<<<<< HEAD
-    if !dest.exists() {
-        println!("Package '{}': cloning at tag '{}'", name, resolved_tag);
-        clone_at_tag(url, &resolved_tag, dest)?;
-=======
     if dest.exists() {
         return Ok(dest.to_path_buf());
->>>>>>> 23f4bb8 (feat: git rev support, global cache for cloned dependencies (Cargo-style))
     }
 
     let cache_dir = global_cache_root().join(cache_key(url, &ref_to_clone));

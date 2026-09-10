@@ -16,16 +16,12 @@ use clap::{Parser, Subcommand};
 /// Smidr is a cargo-inspired build tool for C/C++ projects, meant to
 /// bridge dependencies across different build systems into a single build.
 #[derive(Parser)]
-<<<<<<< HEAD
-#[command(name = "Smidr", version = "0.8.0", long_about = None)]
-=======
 #[command(
     name = "Smidr",
     version = "1.2.0",
     long_about = "Smidr is a cargo-inspired build tool for C/C++ projects, meant to bridge dependencies across different build systems into a single build",
     author = "Max-Mend"
 )]
->>>>>>> 23f4bb8 (feat: git rev support, global cache for cloned dependencies (Cargo-style))
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,

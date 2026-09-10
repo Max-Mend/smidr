@@ -278,11 +278,6 @@ impl Project {
                 SourceLocation::Path(dep_root) => {
                     self.build_and_register_dep(name, spec, &dep_root, is_release)?;
                 }
-<<<<<<< HEAD
-                SourceLocation::Git { url, tag } => {
-                    let dest = self.build_dir.join("deps-src").join(name);
-                    let dep_root = resolver::resolve_git(name, &url, &tag, &dest)?;
-=======
                 SourceLocation::Git {
                     url,
                     tag,
@@ -290,9 +285,7 @@ impl Project {
                     rev,
                 } => {
                     let dest = self.build_dir.join("deps-src").join(name);
-                    let dep_root =
-                        resolver::resolve_git(name, &url, &tag, &branch, &rev, &dest)?;
->>>>>>> 23f4bb8 (feat: git rev support, global cache for cloned dependencies (Cargo-style))
+                    let dep_root = resolver::resolve_git(name, &url, &tag, &branch, &rev, &dest)?;
                     self.build_and_register_dep(name, spec, &dep_root, is_release)?;
                 }
             }
