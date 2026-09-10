@@ -137,9 +137,12 @@ libs = []
 linker_flags = []
 
 [dependencies]
-zlib = "1.3"                                    # system library
-raylib = { git = "https://github.com/raysan5/raylib" }   # git, latest stable tag
-mymath = { path = "../mymath" }                  # local project
+# system library
+zlib = "1.3"
+# git, latest stable tag
+raylib = { git = "https://github.com/raysan5/raylib" }
+# local project
+mymath = { path = "../mymath" }
 ```
 
 ### Dependencies
@@ -148,7 +151,34 @@ A dependency can come from three places:
 
 - **A version string** (`zlib = "1.3"`) - resolved from a local header search, then `pkg-config`
 - **`path`** - a local directory. If it has its own `Smidr.toml`, it's built recursively with Smidr; otherwise Smidr detects and drives its CMake/Meson/Make build
-- **`git`** - cloned at a pinned `tag`, or the latest stable release tag if none is given, then resolved the same way as `path`
+- **`git`** - cloned at a pinned `tag`, `branch`, or `rev` (a specific commit), or the latest stable release tag if none of the three is given, then resolved the same way as `path`. Only one of `tag`/`branch`/`rev` may be set at a time.
+
+```toml
+# latest stable tag
+raylib = { git = "https://github.com/raysan5/raylib" }
+
+# pinned tag
+raylib = { git = "https://github.com/raysan5/raylib", tag = "5.5" }
+
+# tracks a branch
+raylib = { git = "https://github.com/raysan5/raylib", branch = "master" }
+
+# pinned commit
+raylib = { git = "https://github.com/raysan5/raylib", rev = "a1b2c3d" }
+```
+
+Cloned git dependencies are cached globally at `$XDG_CACHE_HOME/smidr/git`
+(or `~/.cache/smidr/git`), shared across every Smidr project on the
+machine - the same dependency pinned to the same `tag`/`branch`/`rev` is
+only ever fetched from the network once.
+
+> **Note:** the cache is keyed by URL + resolved ref and is never
+> refreshed automatically. This is exact for `tag` and `rev` (both are
+> immutable), but a `branch` dependency stays pinned to whichever commit
+> was on that branch the first time it was resolved on your machine,
+> even after the branch moves forward upstream. If you need the latest
+> commit on a tracked branch, clear the cache directory (or the specific
+> entry under it) to force a fresh clone.
 
 > `build_system = "custom"` runs arbitrary shell commands from `build_commands` in `Smidr.toml`. Only use a `Smidr.toml` from a source you trust, the same way you would with any shell script.
 
@@ -175,7 +205,7 @@ platform = "platform"
 
 ## Examples
 
-- [Ricochet](https://github.com/Max-Mend/ricochet) - a DVD-logo-style terminal screensaver, built entirely with Smidr using only the C standard library. (Ricochet was built with Smidr **0.1.0**.)
+- [Ricochet](https://github.com/Max-Mend/ricochet) - a DVD-logo-style terminal screensaver, built entirely with Smidr using only the C standard library. (Ricochet was built with Smidr **0.1.0**)
 
 ## FAQ / Troubleshooting
 

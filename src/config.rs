@@ -154,6 +154,7 @@ pub enum DependencySpec {
         path: Option<String>,
         tag: Option<String>,
         branch: Option<String>,
+        rev: Option<String>,
         #[serde(default)]
         build_system: BuildSystemKind,
         #[serde(default)]
