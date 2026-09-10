@@ -179,7 +179,6 @@ only ever fetched from the network once.
 > even after the branch moves forward upstream. If you need the latest
 > commit on a tracked branch, clear the cache directory (or the specific
 > entry under it) to force a fresh clone.
-
 > `build_system = "custom"` runs arbitrary shell commands from `build_commands` in `Smidr.toml`. Only use a `Smidr.toml` from a source you trust, the same way you would with any shell script.
 
 ### Workspaces
