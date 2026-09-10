@@ -1,6 +1,10 @@
 [package]
 name = "smidr"
+<<<<<<< HEAD
 version = "0.8.0"
+=======
+version = "1.2.0"
+>>>>>>> 23f4bb8 (feat: git rev support, global cache for cloned dependencies (Cargo-style))
 edition = "2024"
 authors = ["Max-Mend"]
 description = "Smidr is a cargo-inspired build tool for C projects, meant to bridge dependencies across different build systems into a single build."

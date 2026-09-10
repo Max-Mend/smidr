@@ -153,6 +153,11 @@ pub enum DependencySpec {
         git: Option<String>,
         path: Option<String>,
         tag: Option<String>,
+<<<<<<< HEAD
+=======
+        branch: Option<String>,
+        rev: Option<String>,
+>>>>>>> 23f4bb8 (feat: git rev support, global cache for cloned dependencies (Cargo-style))
         #[serde(default)]
         build_system: BuildSystemKind,
         #[serde(default)]
