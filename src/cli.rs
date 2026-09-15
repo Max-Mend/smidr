@@ -18,7 +18,7 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(
     name = "Smidr",
-    version = "1.2.0",
+    version = "1.2.1",
     long_about = "Smidr is a cargo-inspired build tool for C/C++ projects, meant to bridge dependencies across different build systems into a single build",
     author = "Max-Mend"
 )]
