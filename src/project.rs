@@ -256,11 +256,27 @@ impl Project {
     ///
     /// For now, only `Version` (system library) specs are handled -
     /// `path`/`git` wiring into an actual build comes later.
-    pub fn resolve_dependencies(&mut self, is_release: bool) -> Result<()> {
+    ///
+    /// When `dry_run` is `true`, no dependency is actually resolved -
+    /// no network access, no git clone, no CMake/Meson/Make invocation,
+    /// no writes under `target/deps/`. Each dependency instead prints
+    /// what would have happened, and `resolved_deps` is left empty.
+    ///
+    /// This means a subsequent `dry_run` call to
+    /// [`crate::builder::build_project`] will print compile commands
+    /// *without* the `-I`/`-L`/`-l` flags dependencies would normally
+    /// contribute, since those flags come from `resolved_deps` and none
+    /// were actually resolved. The printed dry-run commands show the
+    /// overall shape of the build, not the exact final flags.
+    pub fn resolve_dependencies(&mut self, is_release: bool, dry_run: bool) -> Result<()> {
         let dependencies = self.config.dependencies.clone();
         for (name, spec) in &dependencies {
             match resolver::resolve(name, spec, &self.root)? {
                 SourceLocation::System { .. } => {
+                    if dry_run {
+                        println!("Would resolve system library: {}", name);
+                        continue;
+                    }
                     let lib_info = resolver::resolve_system_lib(name)?;
                     self.resolved_deps.push((
                         name.to_string(),
@@ -276,6 +292,10 @@ impl Project {
                     ));
                 }
                 SourceLocation::Path(dep_root) => {
+                    if dry_run {
+                        println!("Would build path dependency: {} ({})", name, dep_root.display());
+                        continue;
+                    }
                     self.build_and_register_dep(name, spec, &dep_root, is_release)?;
                 }
                 SourceLocation::Git {
@@ -284,8 +304,13 @@ impl Project {
                     branch,
                     rev,
                 } => {
+                    if dry_run {
+                        println!("Would resolve git dependency: {} ({})", name, url);
+                        continue;
+                    }
                     let dest = self.build_dir.join("deps-src").join(name);
-                    let dep_root = resolver::resolve_git(name, &url, &tag, &branch, &rev, &dest)?;
+                    let dep_root =
+                        resolver::resolve_git(name, &url, &tag, &branch, &rev, &dest)?;
                     self.build_and_register_dep(name, spec, &dep_root, is_release)?;
                 }
             }
