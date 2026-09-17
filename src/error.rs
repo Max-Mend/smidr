@@ -25,12 +25,6 @@ pub enum BuildError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
-    /// A subprocess could not be started at all (distinct from a process
-    /// that started but exited with a non-zero status - see
-    /// [`BuildError::CommandFailed`]).
-    #[error("Failed to run command: {0}")]
-    Command(String),
-
     /// A subprocess ran but exited with a non-zero status code.
     #[error("Command `{cmd}` exited with code {code:?}")]
     CommandFailed { cmd: String, code: Option<i32> },
@@ -59,10 +53,6 @@ pub enum BuildError {
     #[error("No .h files found in include/")]
     NoHeaderFiles,
 
-    /// Cleaned target directory.
-    #[error("Cleaned target directory: {0}")]
-    Clean(String),
-
     /// A tool was not found.
     #[error("'{tool}' not found. {hint}")]
     ToolNotFound { tool: String, hint: String },
@@ -86,12 +76,6 @@ pub enum BuildError {
     /// Failed to serialize the `compile_commands.json` entries.
     #[error("Failed to serialize JSON: {0}")]
     Json(#[from] serde_json::Error),
-
-    // ---- Dependencies (resolver.rs / toolchain/*) ----
-    /// A dependency's `build_system` value in `Smidr.toml` does not match
-    /// any known [`crate::config::BuildSystemKind`].
-    #[error("Unknown build system '{0}' for dependency '{1}'")]
-    UnknownBuildSystem(String, String),
 
     /// `build_system = "auto"` was set for a dependency, but none of the
     /// supported build systems (CMake, Meson, Make) could be detected in

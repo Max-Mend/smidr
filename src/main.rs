@@ -55,9 +55,9 @@ fn run() -> error::Result<()> {
             let project = project::Project::load(&std::env::current_dir()?)?;
             builder::fmt_project(&project)
         }
-        Commands::Add { name } => {
+        Commands::Add { names } => {
             let mut project = project::Project::load(&std::env::current_dir()?)?;
-            project.add_dependency(name)
+            project.add_dependencies(names)
         }
         Commands::Remove { name } => {
             let mut project = project::Project::load(&std::env::current_dir()?)?;
@@ -68,6 +68,14 @@ fn run() -> error::Result<()> {
             builder::lint_project(&project)
         }
         Commands::Update => builder::update_project(),
+        Commands::Check => {
+            let project = project::Project::load(&std::env::current_dir()?)?;
+            builder::check_project(&project)
+        }
+        Commands::Deps => {
+            let project = project::Project::load(&std::env::current_dir()?)?;
+            builder::deps_project(&project)
+        },
     }
 }
 

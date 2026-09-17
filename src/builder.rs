@@ -18,14 +18,6 @@ use crate::error::Result;
 use crate::project::Project;
 use std::path::PathBuf;
 
-/// A single compiled `.c` file, paired with the exact command used to
-/// produce it. Currently unused - intended for feeding
-/// [`crate::compile_db`] once that's wired into `build_project`.
-pub struct CompiledObject {
-    obj_path: PathBuf,
-    compile_command: String,
-}
-
 /// Everything needed to invoke the compiler: which binary, which include
 /// paths, and which extra flags.
 pub struct CompileOptions {
@@ -138,6 +130,7 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
             ),
         };
         cmd.arg(std_flag);
+        cmd.args(&opts.cflags);
 
         // Recording the actual command used for this specific file -
         // doing it before .output(), while cmd is still available for formatting,
@@ -471,6 +464,79 @@ pub fn update_project() -> Result<()> {
     }
 
     println!("Smidr updated successfully!");
+    
+    Ok(())
+}
+    
+pub fn check_project(project: &Project) -> Result<()> {
+    let project_section = project.config.project.as_ref().ok_or_else(|| {
+        crate::error::BuildError::Dependency {
+            name: project.root.display().to_string(),
+            reason: "cannot check: Smidr.toml has no [project] section".to_string(),
+        }
+    })?;
+
+    let files = project.source_files()?;
+
+    let clang_binary = match project_section.language {
+        crate::config::Language::C => "clang",
+        crate::config::Language::Cpp => "clang++",
+    };
+
+    let mut cmd = std::process::Command::new(clang_binary);
+    cmd.arg("-fsyntax-only");
+    cmd.args(&files);
+
+    let status = cmd.status()?;
+    if !status.success() {
+        return Err(crate::error::BuildError::CommandFailed {
+            cmd: clang_binary.to_string(),
+            code: status.code(),
+        });
+    }
+
+    println!("Checked {} file(s).", files.len());
+    Ok(())
+}
+
+pub fn deps_project(project: &Project) -> Result<()> {
+    if project.config.dependencies.is_empty() {
+        println!("No dependencies found.");
+        return Ok(());
+    }
+
+    println!("Dependencies:");
+    for (name, spec) in &project.config.dependencies {
+        match spec {
+            crate::config::DependencySpec::Version(ver) => {
+                println!("- {} ({})", name, ver);
+            }
+            crate::config::DependencySpec::Detailed {
+                git,
+                path,
+                tag,
+                branch,
+                rev,
+                ..
+            } => {
+                if let Some(path) = path {
+                    println!("- {} (path: {})", name, path);
+                } else if let Some(git) = git {
+                    if let Some(tag) = tag {
+                        println!("- {} (git: {}, tag: {})", name, git, tag);
+                    } else if let Some(branch) = branch {
+                        println!("- {} (git: {}, branch: {})", name, git, branch);
+                    } else if let Some(rev) = rev {
+                        println!("- {} (git: {}, rev: {})", name, git, rev);
+                    } else {
+                        println!("- {} (git: {})", name, git);
+                    }
+                } else {
+                    println!("- {}", name);
+                }
+            }
+        }
+    }
     
     Ok(())
 }

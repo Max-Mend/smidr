@@ -18,7 +18,7 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(
     name = "Smidr",
-    version = "1.2.0",
+    version = "1.3.0",
     long_about = "Smidr is a cargo-inspired build tool for C/C++ projects, meant to bridge dependencies across different build systems into a single build",
     author = "Max-Mend"
 )]
@@ -92,8 +92,12 @@ pub enum Commands {
     #[command(alias = "fmt")]
     Format,
     /// Add a dependency to the project.
+    /// Add one or more dependencies to the project.
     #[command(alias = "a")]
-    Add { name: String },
+    Add {
+        #[arg(required = true, num_args = 1..)]
+        names: Vec<String>,
+    },
     /// Remove a dependency from the project.
     #[command(alias = "rm")]
     Remove { name: String },
@@ -103,6 +107,10 @@ pub enum Commands {
     /// Update smidr to the latest version.
     #[command(alias = "up")]
     Update,
+    #[command(alias = "che")]
+    Check,
+    #[command(alias = "dep")]
+    Deps,
 
     // TODO:
     // -- Smidr Modules --
@@ -110,8 +118,6 @@ pub enum Commands {
     // * Module Remove
     // * Module Update
     // * Module Clean
-    // * Module Rebuild
-    // * Module Build
     // * Module New    
 }
 

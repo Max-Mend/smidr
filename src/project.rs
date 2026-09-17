@@ -374,16 +374,44 @@ impl Project {
         Ok(())
     }
 
-    pub fn add_dependency(&mut self, name: &str) -> Result<()> {
-        resolver::resolve_system_lib(name)?;
-        self.config.dependencies.insert(
-            name.to_string(),
-            crate::config::DependencySpec::Version("*".to_string()),
-        );
+    pub fn add_dependencies(&mut self, names: &[String]) -> Result<()> {
+        let mut added = Vec::new();
+        let mut failed = Vec::new();
 
-        std::fs::write(self.root.join("Smidr.toml"), self.config.to_toml_string()?)?;
+        for name in names {
+            match resolver::resolve_system_lib(name) {
+                Ok(_) => {
+                    self.config.dependencies.insert(
+                        name.clone(),
+                        crate::config::DependencySpec::Version("*".to_string()),
+                    );
+                    added.push(name.clone());
+                }
+                Err(e) => {
+                    eprintln!("Could not add '{}': {}", name, e);
+                    failed.push(name.clone());
+                }
+            }
+        }
 
-        println!("Added dependency: {}", name);
+        if !added.is_empty() {
+            std::fs::write(self.root.join("Smidr.toml"), self.config.to_toml_string()?)?;
+            for name in &added {
+                println!("Added dependency: {}", name);
+            }
+        }
+
+        if !failed.is_empty() {
+            return Err(crate::error::BuildError::Dependency {
+                name: failed.join(", "),
+                reason: format!(
+                    "{} of {} dependencies could not be resolved",
+                    failed.len(),
+                    names.len()
+                ),
+            });
+        }
+
         Ok(())
     }
 
