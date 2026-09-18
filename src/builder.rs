@@ -465,35 +465,77 @@ pub fn update_project() -> Result<()> {
     Ok(())
 }
     
+/// Validate that a project is correctly configured and ready to build,
+/// without invoking the compiler on any source file. Unlike `lint`
+/// (which asks "does the compiler accept this code"), `check` asks
+/// "is this project set up correctly" - manifest sections, an available
+/// compiler, and the presence of source/header files.
+///
+/// Every check runs even if an earlier one fails, so a single
+/// invocation reports every problem at once rather than making the
+/// user fix-and-rerun repeatedly.
 pub fn check_project(project: &Project) -> Result<()> {
-    let project_section = project.config.project.as_ref().ok_or_else(|| {
-        crate::error::BuildError::Dependency {
-            name: project.root.display().to_string(),
-            reason: "cannot check: Smidr.toml has no [project] section".to_string(),
+    let mut issues: Vec<String> = Vec::new();
+
+    let project_section = match &project.config.project {
+        Some(p) => {
+            println!("[project] section: {} v{}", p.name, p.version);
+            Some(p)
         }
-    })?;
-
-    let files = project.source_files()?;
-
-    let clang_binary = match project_section.language {
-        crate::config::Language::C => "clang",
-        crate::config::Language::Cpp => "clang++",
+        None => {
+            issues.push("no [project] section in Smidr.toml".to_string());
+            None
+        }
     };
 
-    let mut cmd = std::process::Command::new(clang_binary);
-    cmd.arg("-fsyntax-only");
-    cmd.args(&files);
+    let build_section = match &project.config.build {
+        Some(b) => {
+            println!("[build] section present");
+            Some(b)
+        }
+        None => {
+            issues.push("no [build] section in Smidr.toml".to_string());
+            None
+        }
+    };
 
-    let status = cmd.status()?;
-    if !status.success() {
-        return Err(crate::error::BuildError::CommandFailed {
-            cmd: clang_binary.to_string(),
-            code: status.code(),
-        });
+    match (project_section, build_section) {
+        (Some(p), Some(b)) => match compiler_binary(&b.compiler, &p.language) {
+            Ok(compiler) => println!("Compiler: {} (found on PATH)", compiler),
+            Err(e) => issues.push(format!("no usable compiler found: {}", e)),
+        },
+        _ => issues.push(
+            "skipped compiler check: [project] or [build] section missing".to_string(),
+        ),
     }
 
-    println!("Checked {} file(s).", files.len());
-    Ok(())
+    match project.source_files() {
+        Ok(files) => println!("Source files: {}", files.len()),
+        Err(e) => issues.push(format!("source files: {}", e)),
+    }
+
+    match project.header_files() {
+        Ok(files) => println!("Header files: {}", files.len()),
+        Err(_) => println!("  (no header files - fine if this project doesn't use any)"),
+    }
+
+    let dep_count = project.config.dependencies.len();
+    println!("  Dependencies declared: {}", dep_count);
+    println!();
+
+    if issues.is_empty() {
+        println!("Project looks ready to build.");
+        Ok(())
+    } else {
+        eprintln!("Found {} issue(s):", issues.len());
+        for issue in &issues {
+            eprintln!("  ✗ {}", issue);
+        }
+        Err(crate::error::BuildError::Dependency {
+            name: project.root.display().to_string(),
+            reason: format!("{} issue(s) found - see above", issues.len()),
+        })
+    }
 }
 
 pub fn deps_project(project: &Project) -> Result<()> {
