@@ -415,11 +415,33 @@ impl Project {
         Ok(())
     }
 
-    pub fn remove_dependency(&mut self, name: &str) -> Result<()> {
-        self.config.dependencies.remove(name);
-        std::fs::write(self.root.join("Smidr.toml"), self.config.to_toml_string()?)?;
+    pub fn remove_dependencies(&mut self, names: &[String]) -> Result<()> {
+        let mut removed = Vec::new();
+        let mut not_found = Vec::new();
 
-        println!("Removed dependency: {}", name);
+        for name in names {
+            if self.config.dependencies.remove(name).is_some() {
+                self.resolved_deps.retain(|(dep_name, _)| dep_name != name);
+                removed.push(name.clone());
+            } else {
+                not_found.push(name.clone());
+            }
+        }
+
+        if !removed.is_empty() {
+            std::fs::write(self.root.join("Smidr.toml"), self.config.to_toml_string()?)?;
+            for name in &removed {
+                println!("Removed dependency: {}", name);
+            }
+        }
+
+        if !not_found.is_empty() {
+            eprintln!(
+                "Warning: not a dependency, nothing to remove: {}",
+                not_found.join(", ")
+            );
+        }
+
         Ok(())
     }
 }

@@ -146,7 +146,7 @@ pub struct BuildSection {
 #[serde(untagged)]
 pub enum DependencySpec {
     /// A version string for a system library, e.g. `zlib = "1.3"`.
-    /// Resolved via a local search, then `pkg-config`.
+    /// Resolved via `pkg-config`, falling back to a local header search.
     Version(String),
     /// A `git`, `path`, or build-system-configured dependency.
     Detailed {

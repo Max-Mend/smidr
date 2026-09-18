@@ -126,7 +126,7 @@ hello/
 [project]
 name = "hello"
 version = "0.1.0"
-type = "bin"           # bin | static | dynamic
+type = "bin"            # bin | static | dynamic
 language = "c"          # c | cpp
 c_standard = "c17"
 
@@ -137,9 +137,14 @@ libs = []
 linker_flags = []
 
 [dependencies]
-zlib = "1.3"                                    # system library
-raylib = { git = "https://github.com/raysan5/raylib" }   # git, latest stable tag
-mymath = { path = "../mymath" }                  # local project
+# system library
+zlib = "1.3"
+
+# git, latest stable tag
+raylib = { git = "https://github.com/raysan5/raylib" }
+
+# local project
+mymath = { path = "../mymath" }
 ```
 
 ### Dependencies
@@ -151,10 +156,17 @@ A dependency can come from three places:
 - **`git`** - cloned at a pinned `tag`, `branch`, or `rev` (a specific commit), or the latest stable release tag if none of the three is given, then resolved the same way as `path`. Only one of `tag`/`branch`/`rev` may be set at a time.
 
 ```toml
-raylib = { git = "https://github.com/raysan5/raylib" }                       # latest stable tag
-raylib = { git = "https://github.com/raysan5/raylib", tag = "5.5" }          # pinned tag
-raylib = { git = "https://github.com/raysan5/raylib", branch = "master" }    # tracks a branch
-raylib = { git = "https://github.com/raysan5/raylib", rev = "a1b2c3d" }      # pinned commit
+# latest stable tag
+raylib = { git = "https://github.com/raysan5/raylib" }
+
+# pinned tag
+raylib = { git = "https://github.com/raysan5/raylib", tag = "5.5" }
+
+# tracks a branch
+raylib = { git = "https://github.com/raysan5/raylib", branch = "master" }
+
+# pinned commit
+raylib = { git = "https://github.com/raysan5/raylib", rev = "a1b2c3d" }
 ```
 
 Cloned git dependencies are cached globally at `$XDG_CACHE_HOME/smidr/git`
@@ -187,8 +199,8 @@ This works whether or not the root itself has a `[project]` section - a pure org
 
 ```toml
 [paths]
-src_dir = "sources"    # override the default "src"
-include = "headers"     # override the default "include"
+src_dir = "sources"      # override the default "src"
+include = "headers"      # override the default "include"
 core = "core"            # any extra name compiles alongside src_dir
 platform = "platform"
 ```

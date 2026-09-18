@@ -59,9 +59,9 @@ fn run() -> error::Result<()> {
             let mut project = project::Project::load(&std::env::current_dir()?)?;
             project.add_dependencies(names)
         }
-        Commands::Remove { name } => {
+        Commands::Remove { names } => {
             let mut project = project::Project::load(&std::env::current_dir()?)?;
-            project.remove_dependency(name)
+            project.remove_dependencies(names)
         }
         Commands::Lint => {
             let project = project::Project::load(&std::env::current_dir()?)?;

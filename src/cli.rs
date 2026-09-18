@@ -91,16 +91,18 @@ pub enum Commands {
     /// Format project source and header files with clang-format.
     #[command(alias = "fmt")]
     Format,
-    /// Add a dependency to the project.
     /// Add one or more dependencies to the project.
     #[command(alias = "a")]
     Add {
         #[arg(required = true, num_args = 1..)]
         names: Vec<String>,
     },
-    /// Remove a dependency from the project.
+    /// Remove one or more dependencies from the project.
     #[command(alias = "rm")]
-    Remove { name: String },
+    Remove {
+        #[arg(required = true, num_args = 1..)]
+        names: Vec<String>,
+    },
     /// Check source files for syntax errors without compiling.
     #[command(alias = "l")]
     Lint,

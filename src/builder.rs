@@ -13,7 +13,7 @@
 //! here yet (see the crate's roadmap).
 
 use crate::compile_db::CompileCommand;
-use crate::diagnostics::{Diagnostic, print_diagnostic};
+use crate::diagnostics::{parse_all, print_all};
 use crate::error::Result;
 use crate::project::Project;
 use std::path::PathBuf;
@@ -155,19 +155,16 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
         let output = cmd.output()?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            let mut printed_pretty = false;
+            let diagnostics = parse_all(&stderr);
 
-            for line in stderr.lines() {
-                if let Some(diag) = Diagnostic::parse_line(line) {
-                    print_diagnostic(&diag);
-                    printed_pretty = true;
-                    break;
-                }
-            }
-            let error_detail = if printed_pretty {
-                "See error details above...".to_string()
-            } else {
+            let error_detail = if diagnostics.is_empty() {
+                // Compiler crashed or produced output in a format we do not
+                // parse (e.g. tcc's diagnostics differ from gcc/clang) - show
+                // the raw stderr rather than silently dropping it.
                 stderr.to_string()
+            } else {
+                print_all(&diagnostics);
+                "See error details above...".to_string()
             };
 
             return Err(crate::error::BuildError::Compile(
@@ -537,7 +534,7 @@ pub fn deps_project(project: &Project) -> Result<()> {
             }
         }
     }
-    
+
     Ok(())
 }
     
