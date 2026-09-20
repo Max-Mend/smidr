@@ -103,6 +103,7 @@ pub enum CStandard {
     Gnu99,
     Gnu11,
     Gnu17,
+    Gnu23,
 }
 
 #[derive(Debug, Clone, clap::ValueEnum, Default, Serialize, Deserialize)]
@@ -146,7 +147,7 @@ pub struct BuildSection {
 #[serde(untagged)]
 pub enum DependencySpec {
     /// A version string for a system library, e.g. `zlib = "1.3"`.
-    /// Resolved via `pkg-config`, falling back to a local header search.
+    /// Resolved via a local search, then `pkg-config`.
     Version(String),
     /// A `git`, `path`, or build-system-configured dependency.
     Detailed {
@@ -422,6 +423,7 @@ impl std::fmt::Display for CStandard {
             CStandard::Gnu99 => "gnu99",
             CStandard::Gnu11 => "gnu11",
             CStandard::Gnu17 => "gnu17",
+            CStandard::Gnu23 => "gnu23",
         };
         f.write_str(s)
     }

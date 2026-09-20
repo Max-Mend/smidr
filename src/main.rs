@@ -75,7 +75,7 @@ fn run() -> error::Result<()> {
         Commands::Deps => {
             let project = project::Project::load(&std::env::current_dir()?)?;
             builder::deps_project(&project)
-        },
+        }
     }
 }
 

@@ -91,13 +91,13 @@ pub enum Commands {
     /// Format project source and header files with clang-format.
     #[command(alias = "fmt")]
     Format,
-    /// Add one or more dependencies to the project.
+    /// Add a dependency to the project.
     #[command(alias = "a")]
     Add {
         #[arg(required = true, num_args = 1..)]
         names: Vec<String>,
     },
-    /// Remove one or more dependencies from the project.
+    /// Remove a dependency from the project.
     #[command(alias = "rm")]
     Remove {
         #[arg(required = true, num_args = 1..)]
@@ -109,17 +109,24 @@ pub enum Commands {
     /// Update smidr to the latest version.
     #[command(alias = "up")]
     Update,
-    #[command(alias = "che")]
-    Check,
-    #[command(alias = "dep")]
+    /// List all dependencies of the current project.
+    #[command(alias = "d")]
     Deps,
+    /// Check if the project is ready to build.
+    #[command(alias = "chk")]
+    Check,
 
     // TODO:
+    // -- Smidr Flags --
+    // * update --deps
+    
     // -- Smidr Modules --
     // * Module Add
     // * Module Remove
     // * Module Update
     // * Module Clean
+    // * Module Rebuild
+    // * Module Build
     // * Module New    
 }
 

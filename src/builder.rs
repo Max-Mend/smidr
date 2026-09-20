@@ -108,6 +108,7 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
                 .map(|p| format!("-I{}", p.display()))
                 .collect::<Vec<_>>(),
         );
+        cmd.args(&opts.cflags);
         cmd.arg(match profile.opt_level {
             crate::config::OptLevel::None => "-O0",
             crate::config::OptLevel::Speed => "-O2",
@@ -130,7 +131,6 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
             ),
         };
         cmd.arg(std_flag);
-        cmd.args(&opts.cflags);
 
         // Recording the actual command used for this specific file -
         // doing it before .output(), while cmd is still available for formatting,
@@ -153,17 +153,17 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
         }
 
         let output = cmd.output()?;
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let diagnostics = parse_all(&stderr);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let diagnostics = parse_all(&stderr);
 
+        if !diagnostics.is_empty() {
+            print_all(&diagnostics);
+        }
+
+        if !output.status.success() {
             let error_detail = if diagnostics.is_empty() {
-                // Compiler crashed or produced output in a format we do not
-                // parse (e.g. tcc's diagnostics differ from gcc/clang) - show
-                // the raw stderr rather than silently dropping it.
                 stderr.to_string()
             } else {
-                print_all(&diagnostics);
                 "See error details above...".to_string()
             };
 
@@ -464,7 +464,7 @@ pub fn update_project() -> Result<()> {
     
     Ok(())
 }
-    
+
 /// Validate that a project is correctly configured and ready to build,
 /// without invoking the compiler on any source file. Unlike `lint`
 /// (which asks "does the compiler accept this code"), `check` asks
@@ -579,4 +579,3 @@ pub fn deps_project(project: &Project) -> Result<()> {
 
     Ok(())
 }
-    

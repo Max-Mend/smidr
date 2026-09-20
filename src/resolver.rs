@@ -78,11 +78,11 @@ fn parse_flags(bytes: &[u8]) -> Vec<String> {
 }
 
 pub fn resolve_system_lib(name: &str) -> Result<SystemLibInfo> {
-    if let Some(pkg) = try_pkg_config(name) {
-        return Ok(pkg);
-    }
     if let Some(found) = check_known_paths(name) {
         return Ok(found);
+    }
+    if let Some(pkg) = try_pkg_config(name) {
+        return Ok(pkg);
     }
     Err(BuildError::Dependency {
         name: name.to_string(),
