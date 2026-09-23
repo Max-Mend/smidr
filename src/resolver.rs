@@ -78,18 +78,17 @@ fn parse_flags(bytes: &[u8]) -> Vec<String> {
 }
 
 pub fn resolve_system_lib(name: &str) -> Result<SystemLibInfo> {
-    if let Some(found) = check_known_paths(name) {
-        return Ok(found);
-    }
     if let Some(pkg) = try_pkg_config(name) {
         return Ok(pkg);
+    }
+    if let Some(found) = check_known_paths(name) {
+        return Ok(found);
     }
     Err(BuildError::Dependency {
         name: name.to_string(),
         reason: "not found locally or via pkg-config".to_string(),
     })
 }
-
 /// Resolve a single dependency's `git`/`path` spec into a
 /// [`SourceLocation`].
 ///
@@ -178,7 +177,7 @@ fn latest_stable_tag(tags: Vec<String>) -> Option<String> {
 }
 
 fn clone_at_tag(url: &str, tag: &str, dest: &Path) -> Result<()> {
-    run_git_clone(url, dest, &["--branch", tag, "--depth", "1"]).map_err(|reason| {
+    run_git_clone(url, dest, &["--branch", tag, "--depth", "1"], false).map_err(|reason| {
         BuildError::Dependency {
             name: dest.display().to_string(),
             reason: format!("failed to clone {} at tag {}: {}", url, tag, reason),
@@ -187,7 +186,7 @@ fn clone_at_tag(url: &str, tag: &str, dest: &Path) -> Result<()> {
 }
 
 fn clone_at_branch(url: &str, branch: &str, dest: &Path) -> Result<()> {
-    run_git_clone(url, dest, &["--branch", branch, "--depth", "1"]).map_err(|reason| {
+    run_git_clone(url, dest, &["--branch", branch, "--depth", "1"], false).map_err(|reason| {
         BuildError::Dependency {
             name: dest.display().to_string(),
             reason: format!("failed to clone {} at branch {}: {}", url, branch, reason),
@@ -196,7 +195,7 @@ fn clone_at_branch(url: &str, branch: &str, dest: &Path) -> Result<()> {
 }
 
 fn clone_at_rev(url: &str, rev: &str, dest: &Path) -> Result<()> {
-    run_git_clone(url, dest, &[]).map_err(|reason| BuildError::Dependency {
+    run_git_clone(url, dest, &[], false).map_err(|reason| BuildError::Dependency {
         name: dest.display().to_string(),
         reason: format!("failed to clone {}: {}", url, reason),
     })?;
@@ -229,7 +228,29 @@ fn clone_at_rev(url: &str, rev: &str, dest: &Path) -> Result<()> {
 /// and would otherwise sit silent until the whole clone finished)
 /// preserves the `\r` redraws so the live output looks the same as a
 /// bare `git clone` in the terminal.
-fn run_git_clone(url: &str, dest: &Path, extra_args: &[&str]) -> std::result::Result<(), String> {
+fn run_git_clone(
+    url: &str,
+    dest: &Path,
+    extra_args: &[&str],
+    verbose: bool,
+) -> std::result::Result<(), String> {
+    if !verbose {
+        let output = Command::new("git")
+            .arg("clone")
+            .arg("--quiet")
+            .args(extra_args)
+            .arg(url)
+            .arg(dest)
+            .output()
+            .map_err(|e| e.to_string())?;
+        return if output.status.success() {
+            Ok(())
+        } else {
+            Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+        };
+    }
+
+    // verbose: keep the existing rich passthrough with live progress meter
     let mut child = Command::new("git")
         .arg("clone")
         .arg("--progress")
@@ -393,12 +414,9 @@ pub fn resolve_git(
     let cache_dir = global_cache_root().join(cache_key(url, &ref_to_clone));
 
     if cache_dir.exists() {
-        println!(
-            "Package '{}': using cached clone of '{}' (skipping network)",
-            name, ref_to_clone
-        );
+        crate::diagnostics::print_status("Cloning", &format!("{} (cached, {})", name, ref_to_clone));
     } else {
-        println!("Package '{}': cloning at '{}'", name, ref_to_clone);
+        crate::diagnostics::print_status("Cloning", &format!("{} ({})", name, ref_to_clone));
         // Clone into a temporary sibling first and rename into place once
         // complete, so a clone that fails or is interrupted partway
         // through can never leave a corrupt entry behind that a later,

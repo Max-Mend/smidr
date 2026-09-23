@@ -54,9 +54,7 @@ pub trait DepBuilder {
     /// implemented as "does the expected manifest file exist here"
     /// (e.g. `CMakeLists.txt` for CMake). Used by `BuildSystemKind::Auto`
     /// detection; not called for an explicitly configured build system.
-    fn detect(src_dir: &Path) -> bool
-    where
-        Self: Sized;
+    fn detect(src_dir: &Path) -> bool where Self: Sized;
 
     /// A short, human-readable name for this build system ("cmake",
     /// "meson", "make", "custom"), printed to the user so the choice made
@@ -65,7 +63,7 @@ pub trait DepBuilder {
 
     /// Build and install the dependency into `prefix`, returning the
     /// resulting include/lib paths.
-    fn build(&self, src_dir: &Path, prefix: &Path) -> Result<BuildOutput>;
+    fn build(&self, src_dir: &Path, prefix: &Path, verbose: bool) -> Result<BuildOutput>;
 }
 
 /// Pick and construct the right [`DepBuilder`] for a dependency.
@@ -159,13 +157,15 @@ fn build_of(kind: &BuildSystemKind, spec: &DependencySpec) -> Box<dyn DepBuilder
 /// Private to this module tree - accessible from the `toolchain/*`
 /// submodules via `super::run`, since child modules can see their
 /// ancestors' private items.
-fn run(cmd: &mut Command) -> Result<()> {
-    let cmd_str = format!("{:?}", cmd);
-    println!("   $ {}", cmd_str);
+fn run(cmd: &mut Command, verbose: bool, label: &str, message: &str) -> Result<()> {
+    crate::diagnostics::print_status(label, message);
+    if verbose {
+        println!("      $ {:?}", cmd);
+    }
     let status = cmd.status().map_err(BuildError::Io)?;
     if !status.success() {
         return Err(BuildError::CommandFailed {
-            cmd: cmd_str,
+            cmd: format!("{:?}", cmd),
             code: status.code(),
         });
     }

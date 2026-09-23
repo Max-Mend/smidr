@@ -18,7 +18,7 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(
     name = "Smidr",
-    version = "1.2.1",
+    version = "1.3.0",
     long_about = "Smidr is a cargo-inspired build tool for C/C++ projects, meant to bridge dependencies across different build systems into a single build",
     author = "Max-Mend"
 )]
@@ -60,6 +60,9 @@ pub enum Commands {
 
         #[arg(long)]
         dry_run: bool,
+
+        #[arg(long, alias = "inc")]
+        incremental: bool,
     },
     /// Compile and run the current project.
     #[command(alias = "r")]
@@ -72,6 +75,9 @@ pub enum Commands {
 
         #[arg(long)]
         dry_run: bool,
+
+        #[arg(long, alias = "inc")]
+        incremental: bool,
     },
     /// Remove the `target/` build directory.
     #[command(alias = "cl")]
@@ -93,18 +99,31 @@ pub enum Commands {
     Format,
     /// Add a dependency to the project.
     #[command(alias = "a")]
-    Add { name: String },
+    Add {
+        #[arg(required = true, num_args = 1..)]
+        names: Vec<String>,
+    },
     /// Remove a dependency from the project.
     #[command(alias = "rm")]
-    Remove { name: String },
+    Remove {
+        #[arg(required = true, num_args = 1..)]
+        names: Vec<String>,
+    },
     /// Check source files for syntax errors without compiling.
     #[command(alias = "l")]
     Lint,
     /// Update smidr to the latest version.
     #[command(alias = "up")]
     Update,
+    /// List all dependencies of the current project.
+    #[command(alias = "d")]
+    Deps,
+    /// Check if the project is ready to build.
+    #[command(alias = "chk")]
+    Check,
 
     // TODO:
+    
     // -- Smidr Modules --
     // * Module Add
     // * Module Remove

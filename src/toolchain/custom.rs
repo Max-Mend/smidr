@@ -66,7 +66,7 @@ impl DepBuilder for CustomBuilder {
     ///
     /// # Errors
     /// Returns [`BuildError::Dependency`] if `build_commands` is empty.
-    fn build(&self, src_dir: &Path, prefix: &Path) -> Result<BuildOutput> {
+    fn build(&self, src_dir: &Path, prefix: &Path, verbose: bool) -> Result<BuildOutput> {
         if self.commands.is_empty() {
             return Err(BuildError::Dependency {
                 name: src_dir.display().to_string(),
@@ -76,14 +76,16 @@ impl DepBuilder for CustomBuilder {
             });
         }
 
-        for raw_cmd in &self.commands {
+        let total = self.commands.len();
+        for (i, raw_cmd) in self.commands.iter().enumerate() {
             // Let the user reference the install prefix in their commands,
             // e.g. "make install PREFIX=$SMIDR_PREFIX"
             let expanded = raw_cmd.replace("$SMIDR_PREFIX", &prefix.display().to_string());
             run(Command::new("sh")
                 .arg("-c")
                 .arg(&expanded)
-                .current_dir(src_dir))?;
+                .current_dir(src_dir),
+            verbose, "Running", &format!("[{}/{}] {}", i + 1, total, raw_cmd))?;
         }
 
         let mut output = collect_from_prefix(prefix);

@@ -24,24 +24,26 @@ impl DepBuilder for CMakeBuilder {
 
     /// Runs the standard three-step CMake flow: configure into `build/`
     /// with `CMAKE_INSTALL_PREFIX` set to `prefix`, build, then install.
-    fn build(&self, src_dir: &Path, prefix: &Path) -> Result<BuildOutput> {
+    fn build(&self, src_dir: &Path, prefix: &Path, verbose: bool) -> Result<BuildOutput> {
+        let label = src_dir.file_name().and_then(|s| s.to_str()).unwrap_or("dependency");
         // 1. Configure: generate build/ with the desired install prefix.
         run(Command::new("cmake")
-            .args(["-S", ".", "-B", "build"])
-            .arg(format!("-DCMAKE_INSTALL_PREFIX={}", prefix.display()))
-            .arg("-DCMAKE_BUILD_TYPE=Release")
-            .arg("-DCMAKE_POLICY_VERSION_MINIMUM=3.5")
-            .current_dir(src_dir))?;
-
-        // 2. Build.
+                .args(["-S", ".", "-B", "build"])
+                .arg(format!("-DCMAKE_INSTALL_PREFIX={}", prefix.display()))
+                .arg("-DCMAKE_BUILD_TYPE=Release")
+                .arg("-DCMAKE_POLICY_VERSION_MINIMUM=3.5")
+                .current_dir(src_dir),
+            verbose, "Configuring", label)?;
+        // 2. Build
         run(Command::new("cmake")
-            .args(["--build", "build", "--parallel"])
-            .current_dir(src_dir))?;
-
+                .args(["--build", "build", "--parallel"])
+                .current_dir(src_dir),
+            verbose, "Building", label)?;
         // 3. Install into prefix (this is where include/lib come from).
         run(Command::new("cmake")
-            .args(["--install", "build"])
-            .current_dir(src_dir))?;
+                .args(["--install", "build"])
+                .current_dir(src_dir),
+            verbose, "Installing", label)?;
 
         Ok(collect_from_prefix(prefix))
     }

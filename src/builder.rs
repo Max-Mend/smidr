@@ -42,7 +42,7 @@ pub struct CompileOptions {
 /// compiler is found, [`crate::error::BuildError::Compile`] if a source
 /// file fails to compile, or [`crate::error::BuildError::Link`] if the
 /// final link step fails.
-pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: bool) -> Result<()> {
+pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: bool, incremental: bool) -> Result<()> {
     let project_section = project.config.project.as_ref().ok_or_else(|| {
         crate::error::BuildError::Dependency {
             name: project.root.display().to_string(),
@@ -92,6 +92,17 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
         opts.dep_libs.extend(output.libs.clone());
     }
 
+    let newest_header_mtime = if incremental {
+        project.header_files().ok().and_then(|headers| {
+            headers
+                .iter()
+                .filter_map(|h| h.metadata().and_then(|m| m.modified()).ok())
+                .max()
+        })
+    } else {
+        None
+    };
+
     let mut object_files: Vec<PathBuf> = Vec::new();
     let mut compile_commands: Vec<CompileCommand> = Vec::new();
 
@@ -137,8 +148,34 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
         // and after all arguments have been added.
         let command_str = format!("{:?}", cmd);
 
-        if verbose || dry_run {
-            println!("   $ {}", command_str);
+        // Check if the source file is up to date with the object file and the newest header file
+        let up_to_date = incremental && !dry_run && {
+            let src_mtime = src.metadata().and_then(|m| m.modified()).ok();
+            let obj_mtime = obj_path.metadata().and_then(|m| m.modified()).ok();
+            match (src_mtime, obj_mtime) {
+                (Some(s), Some(o)) => s <= o && newest_header_mtime.map_or(true, |h| h <= o),
+                _ => false,
+            }
+        };
+
+        if up_to_date {
+            crate::diagnostics::print_status("Up to date", &src.display().to_string());
+            compile_commands.push(CompileCommand {
+                directory: project.root.display().to_string(),
+                file: src.display().to_string(),
+                command: command_str,
+                output: obj_path.display().to_string(),
+            });
+            object_files.push(obj_path);
+            continue;
+        }
+
+        crate::diagnostics::print_status(
+            if dry_run { "Would compile" } else { "Compiling" },
+            &src.display().to_string(),
+        );
+        if verbose {
+            println!("      $ {}", command_str);
         }
 
         if dry_run {
@@ -213,8 +250,12 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
             if profile.lto { link_cmd.arg("-flto"); }
             if profile.strip { link_cmd.arg("-s"); }
 
-            if verbose || dry_run {
-                println!("   $ {:?}", link_cmd);
+            crate::diagnostics::print_status(
+                if dry_run { "Would link" } else { "Linking" },
+                &binary_path.display().to_string(),
+            );
+            if verbose {
+                println!("      $ {:?}", link_cmd);
             }
             if dry_run {
                 return Ok(());
@@ -235,6 +276,17 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
 
             let mut ar_cmd = std::process::Command::new("ar");
             ar_cmd.arg("rcs").arg(&lib_path).args(&object_files);
+
+            crate::diagnostics::print_status(
+                if dry_run { "Would archive" } else { "Archiving" },
+                &lib_path.display().to_string(),
+            );
+            if verbose {
+                println!("      $ {:?}", ar_cmd);
+            }
+            if dry_run {
+                return Ok(());
+            }
 
             let output = ar_cmd.output()?;
             if !output.status.success() {
@@ -257,6 +309,17 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
             link_cmd.args(build_section.libs.iter().map(|l| format!("-l{}", l)));
             link_cmd.args(&build_section.linker_flags);
 
+            crate::diagnostics::print_status(
+                if dry_run { "Would link" } else { "Linking" },
+                &lib_path.display().to_string(),
+            );
+            if verbose {
+                println!("      $ {:?}", link_cmd);
+            }
+            if dry_run {
+                return Ok(());
+            }
+
             let output = link_cmd.output()?;
             if !output.status.success() {
                 return Err(crate::error::BuildError::Link(
@@ -276,8 +339,8 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
 /// Propagates any error from [`build_project`]. Returns
 /// [`crate::error::BuildError::CommandFailed`] if the binary itself
 /// exits with a non-zero status.
-pub fn run_project(project: &Project, release: bool, verbose: bool, dry_run: bool) -> Result<()> {
-    build_project(project, release, verbose, dry_run)?;
+pub fn run_project(project: &Project, release: bool, verbose: bool, dry_run: bool, incremental: bool) -> Result<()> {
+    build_project(project, release, verbose, dry_run, incremental)?;
 
     if dry_run {
         println!("Dry run: skipping execution.");
@@ -301,7 +364,9 @@ pub fn run_project(project: &Project, release: bool, verbose: bool, dry_run: boo
 
     let binary_path = project.build_dir.join(profile_dir).join("bin").join(binary_name);
 
+    println!();
     println!("Running: {}", binary_path.display());
+    println!();
     let status = std::process::Command::new(&binary_path).status()?;
 
     if !status.success() {
@@ -330,7 +395,7 @@ pub fn clean_project(project: &Project) -> Result<()> {
 
 pub fn rebuild_project(project: &Project, release: bool, verbose: bool, dry_run: bool) -> Result<()> {
     clean_project(project)?;
-    build_project(project, release, verbose, dry_run)
+    build_project(project, release, verbose, dry_run, false)
 }
 
 /// Format project source and header files with clang-format.
@@ -464,4 +529,118 @@ pub fn update_project() -> Result<()> {
     
     Ok(())
 }
-    
+
+/// Validate that a project is correctly configured and ready to build,
+/// without invoking the compiler on any source file. Unlike `lint`
+/// (which asks "does the compiler accept this code"), `check` asks
+/// "is this project set up correctly" - manifest sections, an available
+/// compiler, and the presence of source/header files.
+///
+/// Every check runs even if an earlier one fails, so a single
+/// invocation reports every problem at once rather than making the
+/// user fix-and-rerun repeatedly.
+pub fn check_project(project: &Project) -> Result<()> {
+    let mut issues: Vec<String> = Vec::new();
+
+    let project_section = match &project.config.project {
+        Some(p) => {
+            println!("[project] section: {} v{}", p.name, p.version);
+            Some(p)
+        }
+        None => {
+            issues.push("no [project] section in Smidr.toml".to_string());
+            None
+        }
+    };
+
+    let build_section = match &project.config.build {
+        Some(b) => {
+            println!("[build] section present");
+            Some(b)
+        }
+        None => {
+            issues.push("no [build] section in Smidr.toml".to_string());
+            None
+        }
+    };
+
+    match (project_section, build_section) {
+        (Some(p), Some(b)) => match compiler_binary(&b.compiler, &p.language) {
+            Ok(compiler) => println!("Compiler: {} (found on PATH)", compiler),
+            Err(e) => issues.push(format!("no usable compiler found: {}", e)),
+        },
+        _ => issues.push(
+            "skipped compiler check: [project] or [build] section missing".to_string(),
+        ),
+    }
+
+    match project.source_files() {
+        Ok(files) => println!("Source files: {}", files.len()),
+        Err(e) => issues.push(format!("source files: {}", e)),
+    }
+
+    match project.header_files() {
+        Ok(files) => println!("Header files: {}", files.len()),
+        Err(_) => println!("  (no header files - fine if this project doesn't use any)"),
+    }
+
+    let dep_count = project.config.dependencies.len();
+    println!("  Dependencies declared: {}", dep_count);
+    println!();
+
+    if issues.is_empty() {
+        println!("Project looks ready to build.");
+        Ok(())
+    } else {
+        eprintln!("Found {} issue(s):", issues.len());
+        for issue in &issues {
+            eprintln!("  ✗ {}", issue);
+        }
+        Err(crate::error::BuildError::Dependency {
+            name: project.root.display().to_string(),
+            reason: format!("{} issue(s) found - see above", issues.len()),
+        })
+    }
+}
+
+pub fn deps_project(project: &Project) -> Result<()> {
+    if project.config.dependencies.is_empty() {
+        println!("No dependencies found.");
+        return Ok(());
+    }
+
+    println!("Dependencies:");
+    for (name, spec) in &project.config.dependencies {
+        match spec {
+            crate::config::DependencySpec::Version(ver) => {
+                println!("- {} ({})", name, ver);
+            }
+            crate::config::DependencySpec::Detailed {
+                git,
+                path,
+                tag,
+                branch,
+                rev,
+                ..
+            } => {
+                if let Some(path) = path {
+                    println!("- {} (path: {})", name, path);
+                } else if let Some(git) = git {
+                    if let Some(tag) = tag {
+                        println!("- {} (git: {}, tag: {})", name, git, tag);
+                    } else if let Some(branch) = branch {
+                        println!("- {} (git: {}, branch: {})", name, git, branch);
+                    } else if let Some(rev) = rev {
+                        println!("- {} (git: {}, rev: {})", name, git, rev);
+                    } else {
+                        println!("- {} (git: {})", name, git);
+                    }
+                } else {
+                    println!("- {}", name);
+                }
+            }
+        }
+    }
+
+    Ok(())
+}

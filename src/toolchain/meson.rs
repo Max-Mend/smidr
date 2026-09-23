@@ -24,23 +24,21 @@ impl DepBuilder for MesonBuilder {
 
     /// Runs the standard three-step Meson flow: setup a release build
     /// into `build/` with `--prefix` set to `prefix`, compile, install.
-    fn build(&self, src_dir: &Path, prefix: &Path) -> Result<BuildOutput> {
-        // 1. Set up the build directory with the desired prefix.
+    fn build(&self, src_dir: &Path, prefix: &Path, verbose: bool) -> Result<BuildOutput> {
+        let label = src_dir.file_name().and_then(|s| s.to_str()).unwrap_or("dependency");
+        // 1. Setup the build directory with the desired prefix.
         run(Command::new("meson")
-            .args(["setup", "build"])
-            .arg(format!("--prefix={}", prefix.display()))
-            .arg("--buildtype=release")
-            .current_dir(src_dir))?;
-
+                .args(["setup", "build"])
+                .arg(format!("--prefix={}", prefix.display()))
+                .arg("--buildtype=release")
+                .current_dir(src_dir),
+            verbose, "Configuring", label)?;
         // 2. Compile.
-        run(Command::new("meson")
-            .args(["compile", "-C", "build"])
-            .current_dir(src_dir))?;
-
+        run(Command::new("meson").args(["compile", "-C", "build"]).current_dir(src_dir),
+            verbose, "Building", label)?;
         // 3. Install into prefix.
-        run(Command::new("meson")
-            .args(["install", "-C", "build"])
-            .current_dir(src_dir))?;
+        run(Command::new("meson").args(["install", "-C", "build"]).current_dir(src_dir),
+            verbose, "Installing", label)?;
 
         Ok(collect_from_prefix(prefix))
     }

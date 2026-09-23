@@ -39,21 +39,28 @@ impl DepBuilder for MakeBuilder {
     /// Returns [`BuildError::Dependency`] if the install step fails,
     /// since that most likely means this Makefile does not support
     /// `PREFIX=` at all.
-    fn build(&self, src_dir: &Path, prefix: &Path) -> Result<BuildOutput> {
+    fn build(&self, src_dir: &Path, prefix: &Path, verbose: bool) -> Result<BuildOutput> {
+        let label = src_dir.file_name().and_then(|s| s.to_str()).unwrap_or("dependency");
+        
         // Autotools convention: if `configure` exists, it determines the
         // prefix for the generated Makefile - more reliable than guessing.
         let configure = src_dir.join("configure");
         if configure.exists() {
             run(Command::new("./configure")
-                .arg(format!("--prefix={}", prefix.display()))
-                .current_dir(src_dir))?;
+                    .arg(format!("--prefix={}", prefix.display()))
+                    .current_dir(src_dir),
+                verbose, "Configuring", label)?;
         }
 
-        run(Command::new("make").current_dir(src_dir))?;
+        run(Command::new("make").current_dir(src_dir), verbose, "Building", label)?;
 
         // Most common GNU convention for a bare Makefile without configure.
         // Unlike CMake/Meson, there's no guarantee PREFIX= is supported at
         // all by this particular Makefile.
+        crate::diagnostics::print_status("Installing", label);
+        if verbose {
+            println!("      $ make PREFIX={} install", prefix.display());
+        }
         let install_status = Command::new("make")
             .arg(format!("PREFIX={}", prefix.display()))
             .arg("install")
@@ -65,8 +72,8 @@ impl DepBuilder for MakeBuilder {
             return Err(BuildError::Dependency {
                 name: src_dir.display().to_string(),
                 reason: "`make install PREFIX=...` did not work - this Makefile \
-                         may not support PREFIX=. Set build_system = \"custom\" \
-                         with explicit build_commands in Smidr.toml"
+                        may not support PREFIX=. Set build_system = \"custom\" \
+                        with explicit build_commands in Smidr.toml"
                     .to_string(),
             });
         }

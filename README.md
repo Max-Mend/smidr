@@ -126,7 +126,7 @@ hello/
 [project]
 name = "hello"
 version = "0.1.0"
-type = "bin"           # bin | static | dynamic
+type = "bin"            # bin | static | dynamic
 language = "c"          # c | cpp
 c_standard = "c17"
 
@@ -139,8 +139,10 @@ linker_flags = []
 [dependencies]
 # system library
 zlib = "1.3"
+
 # git, latest stable tag
 raylib = { git = "https://github.com/raysan5/raylib" }
+
 # local project
 mymath = { path = "../mymath" }
 ```
@@ -196,8 +198,8 @@ This works whether or not the root itself has a `[project]` section - a pure org
 
 ```toml
 [paths]
-src_dir = "sources"    # override the default "src"
-include = "headers"     # override the default "include"
+src_dir = "sources"      # override the default "src"
+include = "headers"      # override the default "include"
 core = "core"            # any extra name compiles alongside src_dir
 platform = "platform"
 ```

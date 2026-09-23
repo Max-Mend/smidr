@@ -103,6 +103,7 @@ pub enum CStandard {
     Gnu99,
     Gnu11,
     Gnu17,
+    Gnu23,
 }
 
 #[derive(Debug, Clone, clap::ValueEnum, Default, Serialize, Deserialize)]
@@ -422,6 +423,7 @@ impl std::fmt::Display for CStandard {
             CStandard::Gnu99 => "gnu99",
             CStandard::Gnu11 => "gnu11",
             CStandard::Gnu17 => "gnu17",
+            CStandard::Gnu23 => "gnu23",
         };
         f.write_str(s)
     }
