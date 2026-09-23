@@ -48,7 +48,7 @@ fn run() -> error::Result<()> {
         }
         Commands::Rebuild { release, verbose, dry_run } => {
             let mut project = project::Project::load(&std::env::current_dir()?)?;
-            project.resolve_dependencies(*release, *dry_run)?;
+            project.resolve_dependencies(*release, *verbose, *dry_run)?;
             builder::rebuild_project(&project, *release, *verbose, *dry_run)
         }
         Commands::Format => {
@@ -91,7 +91,7 @@ fn build_current(release: bool, verbose: bool, dry_run: bool) -> error::Result<(
     // If there is a [project] section in the root - build it too
     if raw_config.project.is_some() {
         let mut project = project::Project::load(&cwd)?;
-        project.resolve_dependencies(release, dry_run)?;
+        project.resolve_dependencies(release, verbose, dry_run)?;
         builder::build_project(&project, release, verbose, dry_run)?;
     }
 
@@ -115,7 +115,7 @@ fn run_current(release: bool, verbose: bool, dry_run: bool) -> error::Result<()>
     }
 
     let mut project = project::Project::load(&cwd)?;
-    project.resolve_dependencies(release, dry_run)?;
+    project.resolve_dependencies(release, verbose, dry_run)?;
     builder::run_project(&project, release, verbose, dry_run)
 }
 
@@ -131,7 +131,7 @@ fn build_workspace(
         println!("Building workspace member: {}", member);
 
         let mut member_project = project::Project::load(&member_path)?;
-        member_project.resolve_dependencies(release, dry_run)?;
+        member_project.resolve_dependencies(release, verbose, dry_run)?;
         builder::build_project(&member_project, release, verbose, dry_run)?;
     }
     Ok(())

@@ -14,6 +14,10 @@ use std::fmt;
 const RESET: &str = "\x1b[0m";
 const BOLD: &str = "\x1b[1m";
 const BLUE: &str = "\x1b[1;94m";
+const GREEN: &str = "\x1b[1;92m";
+const RED: &str = "\x1b[1;91m";
+const YELLOW: &str = "\x1b[1;93m";
+const CYAN: &str = "\x1b[1;96m";
 
 /// Severity of a single diagnostic, drives both its color and how it's
 /// counted in [`print_summary`].
@@ -39,9 +43,9 @@ impl Severity {
 
     fn color(self) -> &'static str {
         match self {
-            Self::Error => "\x1b[1;91m",
-            Self::Warning => "\x1b[1;93m",
-            Self::Note => "\x1b[1;96m",
+            Self::Error => RED,
+            Self::Warning => YELLOW,
+            Self::Note => CYAN,
         }
     }
 
@@ -185,7 +189,7 @@ pub fn print_summary(diagnostics: &[Diagnostic]) {
         eprintln!(
             "{}{}error{}: could not compile due to {} previous {}",
             BOLD,
-            Severity::Error.color(),
+            RED,
             RESET,
             errors,
             noun
@@ -195,10 +199,17 @@ pub fn print_summary(diagnostics: &[Diagnostic]) {
         eprintln!(
             "{}{}warning{}: {} {} emitted",
             BOLD,
-            Severity::Warning.color(),
+            YELLOW,
             RESET,
             warnings,
             noun
         );
     }
+}
+
+/// Print a cargo-style status line: a left-aligned, fixed-width,
+/// bold-green verb followed by a message (e.g. "Compiling  main.c",
+/// "Linking    target/debug/bin/app").
+pub fn print_status(verb: &str, message: &str) {
+    println!("{GREEN}{BOLD}{:<13}{RESET} {}", verb, message);
 }

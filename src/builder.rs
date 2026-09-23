@@ -137,8 +137,12 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
         // and after all arguments have been added.
         let command_str = format!("{:?}", cmd);
 
-        if verbose || dry_run {
-            println!("   $ {}", command_str);
+        crate::diagnostics::print_status(
+            if dry_run { "Would compile" } else { "Compiling" },
+            &src.display().to_string(),
+        );
+        if verbose {
+            println!("      $ {}", command_str);
         }
 
         if dry_run {
@@ -213,8 +217,12 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
             if profile.lto { link_cmd.arg("-flto"); }
             if profile.strip { link_cmd.arg("-s"); }
 
-            if verbose || dry_run {
-                println!("   $ {:?}", link_cmd);
+            crate::diagnostics::print_status(
+                if dry_run { "Would link" } else { "Linking" },
+                &binary_path.display().to_string(),
+            );
+            if verbose {
+                println!("      $ {:?}", link_cmd);
             }
             if dry_run {
                 return Ok(());
@@ -236,6 +244,17 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
             let mut ar_cmd = std::process::Command::new("ar");
             ar_cmd.arg("rcs").arg(&lib_path).args(&object_files);
 
+            crate::diagnostics::print_status(
+                if dry_run { "Would archive" } else { "Archiving" },
+                &lib_path.display().to_string(),
+            );
+            if verbose {
+                println!("      $ {:?}", ar_cmd);
+            }
+            if dry_run {
+                return Ok(());
+            }
+
             let output = ar_cmd.output()?;
             if !output.status.success() {
                 return Err(crate::error::BuildError::Link(
@@ -256,6 +275,17 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
             link_cmd.args(opts.dep_libs.iter().map(|l| format!("-l{}", l)));
             link_cmd.args(build_section.libs.iter().map(|l| format!("-l{}", l)));
             link_cmd.args(&build_section.linker_flags);
+
+            crate::diagnostics::print_status(
+                if dry_run { "Would link" } else { "Linking" },
+                &lib_path.display().to_string(),
+            );
+            if verbose {
+                println!("      $ {:?}", link_cmd);
+            }
+            if dry_run {
+                return Ok(());
+            }
 
             let output = link_cmd.output()?;
             if !output.status.success() {
@@ -301,7 +331,9 @@ pub fn run_project(project: &Project, release: bool, verbose: bool, dry_run: boo
 
     let binary_path = project.build_dir.join(profile_dir).join("bin").join(binary_name);
 
+    println!();
     println!("Running: {}", binary_path.display());
+    println!();
     let status = std::process::Command::new(&binary_path).status()?;
 
     if !status.success() {

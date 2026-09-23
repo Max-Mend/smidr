@@ -117,8 +117,6 @@ pub enum Commands {
     Check,
 
     // TODO:
-    // -- Smidr Flags --
-    // * update --deps
     
     // -- Smidr Modules --
     // * Module Add

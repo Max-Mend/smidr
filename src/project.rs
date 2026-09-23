@@ -268,70 +268,52 @@ impl Project {
     /// contribute, since those flags come from `resolved_deps` and none
     /// were actually resolved. The printed dry-run commands show the
     /// overall shape of the build, not the exact final flags.
-    pub fn resolve_dependencies(&mut self, is_release: bool, dry_run: bool) -> Result<()> {
-        let dependencies = self.config.dependencies.clone();
-        for (name, spec) in &dependencies {
-            match resolver::resolve(name, spec, &self.root)? {
-                SourceLocation::System { .. } => {
-                    if dry_run {
-                        println!("Would resolve system library: {}", name);
-                        continue;
-                    }
-                    let lib_info = resolver::resolve_system_lib(name)?;
-                    self.resolved_deps.push((
-                        name.to_string(),
-                        BuildOutput {
-                            include_dirs: lib_info.cflags.iter()
-                                .filter_map(|f| f.strip_prefix("-I").map(PathBuf::from))
-                                .collect(),
-                            lib_dirs: Vec::new(),
-                            libs: lib_info.libs.iter()
-                                .filter_map(|f| f.strip_prefix("-l").map(String::from))
-                                .collect(),
-                        },
-                    ));
+    pub fn resolve_dependencies(&mut self, is_release: bool, verbose: bool, dry_run: bool) -> Result<()> {
+    let dependencies = self.config.dependencies.clone();
+    for (name, spec) in &dependencies {
+        match resolver::resolve(name, spec, &self.root)? {
+            SourceLocation::System { .. } => {
+                if dry_run {
+                    crate::diagnostics::print_status("Would resolve", &format!("{} (system)", name));
+                    continue;
                 }
-                SourceLocation::Path(dep_root) => {
-                    if dry_run {
-                        println!("Would build path dependency: {} ({})", name, dep_root.display());
-                        continue;
-                    }
-                    self.build_and_register_dep(name, spec, &dep_root, is_release)?;
+                crate::diagnostics::print_status("Resolving", &format!("{} (system)", name));
+                let lib_info = resolver::resolve_system_lib(name)?;
+                self.resolved_deps.push((name.to_string(), BuildOutput {
+                    include_dirs: lib_info.cflags.iter().filter_map(|f| f.strip_prefix("-I").map(PathBuf::from)).collect(),
+                    lib_dirs: Vec::new(),
+                    libs: lib_info.libs.iter().filter_map(|f| f.strip_prefix("-l").map(String::from)).collect(),
+                }));
+            }
+            SourceLocation::Path(dep_root) => {
+                if dry_run {
+                    crate::diagnostics::print_status("Would build", &format!("{} ({})", name, dep_root.display()));
+                    continue;
                 }
-                SourceLocation::Git {
-                    url,
-                    tag,
-                    branch,
-                    rev,
-                } => {
-                    if dry_run {
-                        println!("Would resolve git dependency: {} ({})", name, url);
-                        continue;
-                    }
-                    let dest = self.build_dir.join("deps-src").join(name);
-                    let dep_root =
-                        resolver::resolve_git(name, &url, &tag, &branch, &rev, &dest)?;
-                    self.build_and_register_dep(name, spec, &dep_root, is_release)?;
+                self.build_and_register_dep(name, spec, &dep_root, is_release, verbose)?;
+            }
+            SourceLocation::Git { url, tag, branch, rev } => {
+                if dry_run {
+                    crate::diagnostics::print_status("Would clone", &format!("{} ({})", name, url));
+                    continue;
                 }
+                let dest = self.build_dir.join("deps-src").join(name);
+                let dep_root = resolver::resolve_git(name, &url, &tag, &branch, &rev, &dest)?;
+                self.build_and_register_dep(name, spec, &dep_root, is_release, verbose)?;
             }
         }
-        Ok(())
     }
+    Ok(())
+}
 
     /// Build a dependency found at `dep_root` (a `path` on disk, or a
     /// freshly-cloned `git` checkout) and register the result in
     /// `resolved_deps`. Shared between `Path` and `Git` sources, which
     /// differ only in how `dep_root` was found.
-    fn build_and_register_dep(
-        &mut self,
-        name: &str,
-        spec: &crate::config::DependencySpec,
-        dep_root: &Path,
-        is_release: bool,
-    ) -> Result<()> {
+    fn build_and_register_dep(&mut self, name: &str, spec: &crate::config::DependencySpec, dep_root: &Path, is_release: bool, verbose: bool) -> Result<()> {
         if dep_root.join("Smidr.toml").exists() {
             let dep_project = crate::project::Project::load(dep_root)?;
-            crate::builder::build_project(&dep_project, is_release, false, false)?;
+            crate::builder::build_project(&dep_project, is_release, verbose, false)?;
 
             let dep_include = dep_root.join("include");
             let profile_dir = if is_release { "target/release" } else { "target/debug" };
@@ -368,7 +350,7 @@ impl Project {
                 crate::config::DependencySpec::Version(_) => &crate::config::BuildSystemKind::Auto,
             };
             let builder = crate::toolchain::resolve_builder(name, build_system, dep_root, spec)?;
-            let output = builder.build(dep_root, &self.dep_prefix(name))?;
+            let output = builder.build(dep_root, &self.dep_prefix(name), verbose)?;
             self.resolved_deps.push((name.to_string(), output));
         }
         Ok(())
