@@ -60,6 +60,9 @@ pub enum Commands {
 
         #[arg(long)]
         dry_run: bool,
+
+        #[arg(long, alias = "inc")]
+        incremental: bool,
     },
     /// Compile and run the current project.
     #[command(alias = "r")]
@@ -72,6 +75,9 @@ pub enum Commands {
 
         #[arg(long)]
         dry_run: bool,
+
+        #[arg(long, alias = "inc")]
+        incremental: bool,
     },
     /// Remove the `target/` build directory.
     #[command(alias = "cl")]

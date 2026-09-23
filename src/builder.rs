@@ -42,7 +42,7 @@ pub struct CompileOptions {
 /// compiler is found, [`crate::error::BuildError::Compile`] if a source
 /// file fails to compile, or [`crate::error::BuildError::Link`] if the
 /// final link step fails.
-pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: bool) -> Result<()> {
+pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: bool, incremental: bool) -> Result<()> {
     let project_section = project.config.project.as_ref().ok_or_else(|| {
         crate::error::BuildError::Dependency {
             name: project.root.display().to_string(),
@@ -92,6 +92,17 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
         opts.dep_libs.extend(output.libs.clone());
     }
 
+    let newest_header_mtime = if incremental {
+        project.header_files().ok().and_then(|headers| {
+            headers
+                .iter()
+                .filter_map(|h| h.metadata().and_then(|m| m.modified()).ok())
+                .max()
+        })
+    } else {
+        None
+    };
+
     let mut object_files: Vec<PathBuf> = Vec::new();
     let mut compile_commands: Vec<CompileCommand> = Vec::new();
 
@@ -136,6 +147,28 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
         // doing it before .output(), while cmd is still available for formatting,
         // and after all arguments have been added.
         let command_str = format!("{:?}", cmd);
+
+        // Check if the source file is up to date with the object file and the newest header file
+        let up_to_date = incremental && !dry_run && {
+            let src_mtime = src.metadata().and_then(|m| m.modified()).ok();
+            let obj_mtime = obj_path.metadata().and_then(|m| m.modified()).ok();
+            match (src_mtime, obj_mtime) {
+                (Some(s), Some(o)) => s <= o && newest_header_mtime.map_or(true, |h| h <= o),
+                _ => false,
+            }
+        };
+
+        if up_to_date {
+            crate::diagnostics::print_status("Up to date", &src.display().to_string());
+            compile_commands.push(CompileCommand {
+                directory: project.root.display().to_string(),
+                file: src.display().to_string(),
+                command: command_str,
+                output: obj_path.display().to_string(),
+            });
+            object_files.push(obj_path);
+            continue;
+        }
 
         crate::diagnostics::print_status(
             if dry_run { "Would compile" } else { "Compiling" },
@@ -306,8 +339,8 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
 /// Propagates any error from [`build_project`]. Returns
 /// [`crate::error::BuildError::CommandFailed`] if the binary itself
 /// exits with a non-zero status.
-pub fn run_project(project: &Project, release: bool, verbose: bool, dry_run: bool) -> Result<()> {
-    build_project(project, release, verbose, dry_run)?;
+pub fn run_project(project: &Project, release: bool, verbose: bool, dry_run: bool, incremental: bool) -> Result<()> {
+    build_project(project, release, verbose, dry_run, incremental)?;
 
     if dry_run {
         println!("Dry run: skipping execution.");
@@ -362,7 +395,7 @@ pub fn clean_project(project: &Project) -> Result<()> {
 
 pub fn rebuild_project(project: &Project, release: bool, verbose: bool, dry_run: bool) -> Result<()> {
     clean_project(project)?;
-    build_project(project, release, verbose, dry_run)
+    build_project(project, release, verbose, dry_run, false)
 }
 
 /// Format project source and header files with clang-format.

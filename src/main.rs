@@ -40,8 +40,8 @@ fn run() -> error::Result<()> {
             };
             project::Project::init(name, project_type, std.clone().map(Into::into))
         }
-        Commands::Build { release, verbose, dry_run } => build_current(*release, *verbose, *dry_run),
-        Commands::Run { release, verbose, dry_run } => run_current(*release, *verbose, *dry_run),
+        Commands::Build { release, verbose, dry_run, incremental } => build_current(*release, *verbose, *dry_run, *incremental),
+        Commands::Run { release, verbose, dry_run, incremental } => run_current(*release, *verbose, *dry_run, *incremental),
         Commands::Clean => {
             let project = project::Project::load(&std::env::current_dir()?)?;
             builder::clean_project(&project)
@@ -79,26 +79,26 @@ fn run() -> error::Result<()> {
     }
 }
 
-fn build_current(release: bool, verbose: bool, dry_run: bool) -> error::Result<()> {
+fn build_current(release: bool, verbose: bool, dry_run: bool, incremental: bool) -> error::Result<()> {
     let cwd = std::env::current_dir()?;
     let raw_config = config::ManifestConfig::load(&cwd)?;
 
     // If there are workspace members - build them first
     if let Some(workspace) = &raw_config.workspace {
-        build_workspace(&cwd, workspace, release, verbose, dry_run)?;
+        build_workspace(&cwd, workspace, release, verbose, dry_run, incremental)?;
     }
 
     // If there is a [project] section in the root - build it too
     if raw_config.project.is_some() {
         let mut project = project::Project::load(&cwd)?;
         project.resolve_dependencies(release, verbose, dry_run)?;
-        builder::build_project(&project, release, verbose, dry_run)?;
+        builder::build_project(&project, release, verbose, dry_run, incremental)?;
     }
 
     Ok(())
 }
 
-fn run_current(release: bool, verbose: bool, dry_run: bool) -> error::Result<()> {
+fn run_current(release: bool, verbose: bool, dry_run: bool, incremental: bool) -> error::Result<()> {
     let cwd = std::env::current_dir()?;
     let raw_config = config::ManifestConfig::load(&cwd)?;
 
@@ -111,12 +111,12 @@ fn run_current(release: bool, verbose: bool, dry_run: bool) -> error::Result<()>
     }
 
     if let Some(workspace) = &raw_config.workspace {
-        build_workspace(&cwd, workspace, release, verbose, dry_run)?;
+        build_workspace(&cwd, workspace, release, verbose, dry_run, incremental)?;
     }
 
     let mut project = project::Project::load(&cwd)?;
     project.resolve_dependencies(release, verbose, dry_run)?;
-    builder::run_project(&project, release, verbose, dry_run)
+    builder::run_project(&project, release, verbose, dry_run, incremental)
 }
 
 fn build_workspace(
@@ -125,6 +125,7 @@ fn build_workspace(
     release: bool,
     verbose: bool,
     dry_run: bool,
+    incremental: bool,
 ) -> error::Result<()> {
     for member in &workspace.members {
         let member_path = root.join(member);
@@ -132,7 +133,7 @@ fn build_workspace(
 
         let mut member_project = project::Project::load(&member_path)?;
         member_project.resolve_dependencies(release, verbose, dry_run)?;
-        builder::build_project(&member_project, release, verbose, dry_run)?;
+        builder::build_project(&member_project, release, verbose, dry_run, incremental)?;
     }
     Ok(())
 }

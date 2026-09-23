@@ -313,7 +313,7 @@ impl Project {
     fn build_and_register_dep(&mut self, name: &str, spec: &crate::config::DependencySpec, dep_root: &Path, is_release: bool, verbose: bool) -> Result<()> {
         if dep_root.join("Smidr.toml").exists() {
             let dep_project = crate::project::Project::load(dep_root)?;
-            crate::builder::build_project(&dep_project, is_release, verbose, false)?;
+            crate::builder::build_project(&dep_project, is_release, verbose, false, false)?;
 
             let dep_include = dep_root.join("include");
             let profile_dir = if is_release { "target/release" } else { "target/debug" };
