@@ -9,7 +9,7 @@
 //! compiler binary, invokes it once per source file, and links the
 //! results. Dependency include paths (`project.resolved_deps`) are
 //! folded in, but the step that actually populates `resolved_deps` -
-//! calling [`crate::resolver`] and [`crate::toolchain`] - isn't wired up
+//! calling [`crate::resolver`] and [`crate::toolchain`] - is not wired up
 //! here yet (see the crate's roadmap).
 
 use crate::compile_db::CompileCommand;
@@ -56,12 +56,27 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
         }
     })?;
 
-    let sources = project.source_files()?;
-    project.header_files()?;
+    let mut sources = project.source_files()?;
+    let headers = project.header_files()?;
 
     let profile_dir = if release { "release" } else { "debug" };
     let build_dir = project.build_dir.join(profile_dir);
     std::fs::create_dir_all(&build_dir)?;
+
+    if project_section.language == crate::config::Language::Cpp {
+        if let Some(moc_bin) = find_moc_binary() {
+            let moc_generated = run_moc(&headers, &build_dir, &moc_bin, verbose)?;
+            sources.extend(moc_generated);
+        }
+
+        let qrc = qrc_files(project);
+        if !qrc.is_empty() {
+            if let Some(rcc_bin) = find_rcc_binary() {
+                let rcc_generated = run_rcc(&qrc, &build_dir, &rcc_bin, verbose)?;
+                sources.extend(rcc_generated);
+            }
+        }
+    }
 
     let compiler = compiler_binary(&build_section.compiler, &project_section.language)?;
     println!("Using compiler: {}", compiler);
@@ -332,6 +347,294 @@ pub fn build_project(project: &Project, release: bool, verbose: bool, dry_run: b
     Ok(())
 }
 
+// -- moc --
+
+fn find_moc_binary() -> Option<String> {
+    let qt_major = ["Qt6Core", "Qt5Core"].iter().find_map(|pkg| {
+        std::process::Command::new("pkg-config")
+            .arg("--modversion")
+            .arg(pkg)
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .and_then(|o| {
+                String::from_utf8_lossy(&o.stdout)
+                    .trim()
+                    .split('.')
+                    .next()
+                    .and_then(|s| s.parse::<u32>().ok())
+            })
+    })?;
+
+    let mut candidates: Vec<String> = Vec::new();
+
+    // 1. Official Qt mechanism - qtpaths knows where host-tools are located.
+    for qtpaths in [format!("qtpaths{qt_major}"), "qtpaths".to_string()] {
+        for var in ["QT_HOST_LIBEXECS", "QT_INSTALL_LIBEXECS"] {
+            if let Ok(output) = std::process::Command::new(&qtpaths).arg("-query").arg(var).output() {
+                if output.status.success() {
+                    let dir = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    if !dir.is_empty() {
+                        candidates.push(format!("{dir}/moc"));
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. macOS Homebrew.
+    for formula in [format!("qt@{qt_major}"), "qt".to_string()] {
+        if let Ok(output) = std::process::Command::new("brew").arg("--prefix").arg(&formula).output() {
+            if output.status.success() {
+                let prefix = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !prefix.is_empty() {
+                    candidates.push(format!("{prefix}/libexec/moc"));
+                    candidates.push(format!("{prefix}/bin/moc"));
+                }
+            }
+        }
+    }
+
+    // 3. Typical Linux paths - as a fallback option, if qtpaths is missing.
+    for libdir in ["lib", "lib64"] {
+        candidates.push(format!("/usr/{libdir}/qt{qt_major}/libexec/moc"));
+        candidates.push(format!("/usr/{libdir}/qt{qt_major}/bin/moc"));
+        candidates.push(format!("/usr/{libdir}/qt{qt_major}/moc"));
+    }
+
+    // 4. Limited disk search - take the prefix from pkg-config and search
+    // for the "moc" file no deeper than 3 levels, instead of guessing the
+    // specific subdirectory. Saves you when the distribution arranges files
+    // somehow non-standardly (as in the cases from the Arch bug tracker).
+    if let Ok(output) = std::process::Command::new("pkg-config")
+        .arg("--variable=prefix")
+        .arg(format!("Qt{qt_major}Core"))
+        .output()
+    {
+        if output.status.success() {
+            let prefix = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !prefix.is_empty() {
+                find_file_shallow(std::path::Path::new(&prefix), "moc", 3, &mut candidates);
+            }
+        }
+    }
+
+    candidates.push(format!("moc-qt{qt_major}"));
+    candidates.push("moc".to_string());
+
+    for candidate in &candidates {
+        if let Ok(output) = std::process::Command::new(candidate).arg("--version").output() {
+            if output.status.success() {
+                let version_output = String::from_utf8_lossy(&output.stdout);
+                if version_output.contains(&format!("{qt_major}.")) {
+                    return Some(candidate.clone());
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Search for a file with a given name under a root directory, not deeper than a specified depth.
+/// Found files are added to the output vector; 
+/// disk access errors are ignored (no permissions, broken symlinks, etc. - not critical here).
+fn find_file_shallow(root: &std::path::Path, name: &str, max_depth: u32, out: &mut Vec<String>) {
+    if max_depth == 0 {
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(root) else { return };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            find_file_shallow(&path, name, max_depth - 1, out);
+        } else if path.file_name().and_then(|n| n.to_str()) == Some(name) {
+            out.push(path.display().to_string());
+        }
+    }
+}
+
+fn needs_moc(header_content: &str) -> bool {
+    header_content.contains("Q_OBJECT")
+        || header_content.contains("Q_GADGET")
+        || header_content.contains("Q_NAMESPACE")
+}
+
+fn run_moc(
+    headers: &[PathBuf],
+    build_dir: &std::path::Path,
+    moc_bin: &str,
+    verbose: bool,
+) -> Result<Vec<PathBuf>> {
+    let mut generated = Vec::new();
+
+    for header in headers {
+        let content = std::fs::read_to_string(header).unwrap_or_default();
+        if !needs_moc(&content) {
+            continue;
+        }
+
+        let stem = header.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown");
+        let moc_out = build_dir.join(format!("moc_{}.cpp", stem));
+
+        let mut cmd = std::process::Command::new(moc_bin);
+        cmd.arg(header).arg("-o").arg(&moc_out);
+
+        crate::diagnostics::print_status("Moc", &header.display().to_string());
+        if verbose {
+            println!("      $ {:?}", cmd);
+        }
+
+        let output = cmd.output().map_err(crate::error::BuildError::Io)?;
+        if !output.status.success() {
+            return Err(crate::error::BuildError::Compile(
+                header.display().to_string(),
+                String::from_utf8_lossy(&output.stderr).to_string(),
+            ));
+        }
+
+        generated.push(moc_out);
+    }
+
+    Ok(generated)
+}
+
+/// -- rcc --
+
+fn find_rcc_binary() -> Option<String> {
+    let qt_major = ["Qt6Core", "Qt5Core"].iter().find_map(|pkg| {
+        std::process::Command::new("pkg-config")
+            .arg("--modversion")
+            .arg(pkg)
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .and_then(|o| {
+                String::from_utf8_lossy(&o.stdout)
+                    .trim()
+                    .split('.')
+                    .next()
+                    .and_then(|s| s.parse::<u32>().ok())
+            })
+    })?;
+
+    let mut candidates: Vec<String> = Vec::new();
+
+    // 1. Official Qt mechanism - qtpaths knows where host-tools are located.
+    for qtpaths in [format!("qtpaths{qt_major}"), "qtpaths".to_string()] {
+        for var in ["QT_HOST_LIBEXECS", "QT_INSTALL_LIBEXECS"] {
+            if let Ok(output) = std::process::Command::new(&qtpaths).arg("-query").arg(var).output() {
+                if output.status.success() {
+                    let dir = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    if !dir.is_empty() {
+                        candidates.push(format!("{dir}/rcc"));
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. macOS Homebrew.
+    for formula in [format!("qt@{qt_major}"), "qt".to_string()] {
+        if let Ok(output) = std::process::Command::new("brew").arg("--prefix").arg(&formula).output() {
+            if output.status.success() {
+                let prefix = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !prefix.is_empty() {
+                    candidates.push(format!("{prefix}/libexec/rcc"));
+                    candidates.push(format!("{prefix}/bin/rcc"));
+                }
+            }
+        }
+    }
+
+    // 3. Typical Linux paths - as a fallback option, if qtpaths is missing.
+    for libdir in ["lib", "lib64"] {
+        candidates.push(format!("/usr/{libdir}/qt{qt_major}/libexec/rcc"));
+        candidates.push(format!("/usr/{libdir}/qt{qt_major}/bin/rcc"));
+        candidates.push(format!("/usr/{libdir}/qt{qt_major}/rcc"));
+    }
+
+    // 4. Limited disk search - take the prefix from pkg-config and search
+    // for the "rcc" file no deeper than 3 levels, instead of guessing the
+    // specific subdirectory. Saves you when the distribution arranges files
+    // somehow non-standardly (as in the cases from the Arch bug tracker).
+    if let Ok(output) = std::process::Command::new("pkg-config")
+        .arg("--variable=prefix")
+        .arg(format!("Qt{qt_major}Core"))
+        .output()
+    {
+        if output.status.success() {
+            let prefix = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !prefix.is_empty() {
+                find_file_shallow(std::path::Path::new(&prefix), "rcc", 3, &mut candidates);
+            }
+        }
+    }
+
+    candidates.push(format!("rcc-qt{qt_major}"));
+    candidates.push("rcc".to_string());
+
+    for candidate in &candidates {
+        if let Ok(output) = std::process::Command::new(candidate).arg("--version").output() {
+            if output.status.success() {
+                let version_output = String::from_utf8_lossy(&output.stdout);
+                if version_output.contains(&format!("{qt_major}.")) {
+                    return Some(candidate.clone());
+                }
+            }
+        }
+    }
+
+    None
+}
+
+fn qrc_files(project: &Project) -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&project.root) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) == Some("qrc") {
+                found.push(path);
+            }
+        }
+    }
+    found
+}
+
+fn run_rcc(
+    qrc_files: &[PathBuf],
+    build_dir: &std::path::Path,
+    rcc_bin: &str,
+    verbose: bool,
+) -> Result<Vec<PathBuf>> {
+    let mut generated = Vec::new();
+
+    for qrc in qrc_files {
+        let stem = qrc.file_stem().and_then(|s| s.to_str()).unwrap_or("resources");
+        let rcc_out = build_dir.join(format!("qrc_{}.cpp", stem));
+
+        let mut cmd = std::process::Command::new(rcc_bin);
+        cmd.arg(qrc).arg("-o").arg(&rcc_out).arg("-name").arg(stem);
+
+        crate::diagnostics::print_status("Rcc", &qrc.display().to_string());
+        if verbose {
+            println!("      $ {:?}", cmd);
+        }
+
+        let output = cmd.output().map_err(crate::error::BuildError::Io)?;
+        if !output.status.success() {
+            return Err(crate::error::BuildError::Compile(
+                qrc.display().to_string(),
+                String::from_utf8_lossy(&output.stderr).to_string(),
+            ));
+        }
+
+        generated.push(rcc_out);
+    }
+
+    Ok(generated)
+}
+
 /// Build `project` (via [`build_project`]) and then execute the
 /// resulting binary, forwarding its exit status.
 ///
@@ -355,11 +658,11 @@ pub fn run_project(project: &Project, release: bool, verbose: bool, dry_run: boo
     })?;
     let profile_dir = if release { "release" } else { "debug" };
 
-    let output_name = project_section.output_name.as_ref().unwrap_or(&project_section.name);
+    let output_name = project_section.output_name();
     let binary_name = if cfg!(windows) {
         format!("{}.exe", output_name)
     } else {
-        output_name.clone()
+        output_name.to_string()
     };
 
     let binary_path = project.build_dir.join(profile_dir).join("bin").join(binary_name);
@@ -370,6 +673,16 @@ pub fn run_project(project: &Project, release: bool, verbose: bool, dry_run: boo
     let status = std::process::Command::new(&binary_path).status()?;
 
     if !status.success() {
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::ExitStatusExt;
+            if let Some(signal) = status.signal() {
+                return Err(crate::error::BuildError::Signaled {
+                    cmd: binary_path.display().to_string(),
+                    signal,
+                });
+            }
+        }
         return Err(crate::error::BuildError::CommandFailed {
             cmd: binary_path.display().to_string(),
             code: status.code(),
@@ -402,7 +715,7 @@ pub fn rebuild_project(project: &Project, release: bool, verbose: bool, dry_run:
 ///
 /// # Errors
 /// Returns [crate::error::BuildError::CompilerNotFound] if
-/// clang-format isn't on PATH. Returns
+/// clang-format is not on PATH. Returns
 /// [crate::error::BuildError::CommandFailed] if clang-format exits
 /// with a non-zero status.
 pub fn fmt_project(project: &Project) -> Result<()> {

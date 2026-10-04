@@ -83,7 +83,7 @@ pub enum BuildError {
     #[error("Could not detect build system for '{0}' - specify build_system in Smidr.toml")]
     BuildSystemDetectionFailed(String),
 
-    /// A dependency-specific failure that doesn't fit the more specific
+    /// A dependency-specific failure that does not fit the more specific
     /// variants above - used throughout `resolver.rs` and `toolchain/*`
     /// for things like an unreachable source path or a misconfigured
     /// `custom` build.
@@ -100,6 +100,12 @@ pub enum BuildError {
     /// or otherwise not a safe directory name.
     #[error("Invalid project name: {0}")]
     InvalidProjectName(String),
+
+    // ---- Qt (builder.rs) ----
+    /// A tool was killed by a POSIX signal (no exit code).
+    /// Format used by `run_moc` when the process is terminated by a signal.
+    #[error("`{cmd}` was killed by signal {signal}")]
+    Signaled { cmd: String, signal: i32 },
 }
 
 /// Convenience alias so the rest of the crate can write `Result<T>` instead
