@@ -120,7 +120,7 @@ pub fn resolve_builder(
         }
     };
 
-    println!("Package '{}': building with {}", dep_name, builder.name());
+    crate::diagnostics::print_status("Building", &format!("{} with {}", dep_name, builder.name()));
     Ok(builder)
 }
 
@@ -159,16 +159,28 @@ fn build_of(kind: &BuildSystemKind, spec: &DependencySpec) -> Box<dyn DepBuilder
 /// ancestors' private items.
 fn run(cmd: &mut Command, verbose: bool, label: &str, message: &str) -> Result<()> {
     crate::diagnostics::print_status(label, message);
+    
     if verbose {
         println!("      $ {:?}", cmd);
+        let status = cmd.status().map_err(BuildError::Io)?;
+        if !status.success() {
+            return Err(BuildError::CommandFailed {
+                cmd: format!("{:?}", cmd),
+                code: status.code(),
+            });
+        }
+    } else {
+        let output = cmd.output().map_err(BuildError::Io)?;
+        if !output.status.success() {
+            eprint!("{}", String::from_utf8_lossy(&output.stdout));
+            eprint!("{}", String::from_utf8_lossy(&output.stderr));
+            return Err(BuildError::CommandFailed {
+                cmd: format!("{:?}", cmd),
+                code: output.status.code(),
+            });
+        }
     }
-    let status = cmd.status().map_err(BuildError::Io)?;
-    if !status.success() {
-        return Err(BuildError::CommandFailed {
-            cmd: format!("{:?}", cmd),
-            code: status.code(),
-        });
-    }
+
     Ok(())
 }
 

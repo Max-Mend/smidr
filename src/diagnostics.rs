@@ -78,11 +78,11 @@ impl Diagnostic {
     /// Parse one line of gcc/clang diagnostic output
     /// (`file:line:column: severity: message`).
     ///
-    /// Returns `None` for anything that doesn't match - continuation
+    /// Returns `None` for anything that does not match - continuation
     /// lines like "In file included from ...", blank lines, or source
     /// snippets the compiler echoes back - so callers can filter a raw
     /// stderr blob with `.filter_map(Diagnostic::parse_line)` and simply
-    /// ignore what isn't a diagnostic, rather than erroring on it.
+    /// ignore what is not a diagnostic, rather than erroring on it.
     pub fn parse_line(line: &str) -> Option<Self> {
         let mut parts = line.splitn(4, ':');
         let file = parts.next()?.trim();
@@ -108,7 +108,7 @@ impl Diagnostic {
 }
 
 /// Parse every diagnostic out of a raw compiler stderr blob, silently
-/// skipping lines that aren't diagnostics.
+/// skipping lines that are not diagnostics.
 pub fn parse_all(stderr: &str) -> Vec<Diagnostic> {
     stderr.lines().filter_map(Diagnostic::parse_line).collect()
 }
